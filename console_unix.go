@@ -67,7 +67,7 @@ func (t *Console) MakeRaw() error {
 	if t.IsRawMode {
 		return nil
 	}
-
+/*
 	// Based in the system call: void cfmakeraw(struct termios *termios_p)
 
 	// Input modes - no break, no CR to NL, no NL to CR, no carriage return,
@@ -90,6 +90,9 @@ func (t *Console) MakeRaw() error {
 	// We want read to return every single byte, without timeout.
 	t.newState.c_cc[C.VMIN] = 1 // Read returns when one char is available.
 	t.newState.c_cc[C.VTIME] = 0
+*/
+
+	C.cfmakeraw(t.newState)
 
 	// Put the console in raw mode after flushing
 	if err := t.tcsetattr(C.TCSAFLUSH); err != nil {
@@ -99,8 +102,8 @@ func (t *Console) MakeRaw() error {
 	return nil
 }
 
-// Echo turns the echo mode.
-func (t *Console) Echo(echo bool) error {
+// SetEcho turns the echo mode.
+func (t *Console) SetEcho(echo bool) error {
 	if !echo {
 		t.newState.c_lflag &^= (C.ECHO)
 	} else {
@@ -114,8 +117,8 @@ func (t *Console) Echo(echo bool) error {
 	return nil
 }
 
-// ModeChar sets the console to single-character mode.
-func (t *Console) ModeChar() error {
+// SetCharMode sets the console to single-character mode.
+func (t *Console) SetCharMode() error {
 	// Disable canonical mode, and set buffer size to 1 byte.
 	t.newState.c_lflag &^= (C.ICANON)
 	t.newState.c_cc[C.VTIME] = 0
@@ -132,7 +135,7 @@ func (t *Console) ModeChar() error {
 
 // tcgetattr gets the console state.
 func tcgetattr(fd int, state *C.struct_termios) error {
-	// int tcgetattr(int fd, struct termios *termios_p);
+	//sys	int tcgetattr(int fd, struct termios *termios_p)
 	exitCode, errno := C.tcgetattr(C.int(fd), state)
 	if exitCode == 0 {
 		return nil
@@ -141,9 +144,9 @@ func tcgetattr(fd int, state *C.struct_termios) error {
 }
 
 // tcsetattr sets the console state.
-func tcsetattr(fd, optional_actions int, state *C.struct_termios) error {
-	// int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
-	exitCode, errno := C.tcsetattr(C.int(fd), C.int(optional_actions), state)
+func tcsetattr(fd, actions int, state *C.struct_termios) error {
+	//sys	int tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
+	exitCode, errno := C.tcsetattr(C.int(fd), C.int(actions), state)
 	if exitCode == 0 {
 		return nil
 	}
@@ -151,8 +154,8 @@ func tcsetattr(fd, optional_actions int, state *C.struct_termios) error {
 }
 
 // tcsetattr sets the console state; use arguments from Console.
-func (t *Console) tcsetattr(optional_actions int) error {
-	return tcsetattr(t.Fd, optional_actions, t.newState)
+func (t *Console) tcsetattr(actions int) error {
+	return tcsetattr(t.Fd, actions, t.newState)
 }
 
 // == Restore
@@ -163,8 +166,8 @@ type State struct {
 }
 
 // OriginalState returns the console's original state.
-func (t *Console) OriginalState() *State {
-	return &State{t.oldState}
+func (t *Console) OriginalState() State {
+	return State{t.oldState}
 }
 
 // Restore restores the original settings for the console.
@@ -182,7 +185,7 @@ func (t *Console) Restore() error {
 }
 
 // Restore restores the settings from State.
-func Restore(fd int, st *State) error {
+func Restore(fd int, st State) error {
 	if err := tcsetattr(fd, C.TCSANOW, st.wrap); err != nil {
 		return fmt.Errorf("console: could not restore: %s", err)
 	}
@@ -211,7 +214,7 @@ func CheckANSI() bool {
 
 // IsTTY determines if the device is a console.
 func IsTTY(fd int) (bool, error) {
-	// int isatty(int fd);
+	//sys	int isatty(int fd)
 	exitCode, errno := C.isatty(C.int(fd))
 	if exitCode == 1 {
 		return true, nil
@@ -221,7 +224,7 @@ func IsTTY(fd int) (bool, error) {
 
 // TTYName gets the name of a console.
 func TTYName(fd int) (string, error) {
-	// char *ttyname(int fd);
+	//sys	char *ttyname(int fd)
 	name, errno := C.ttyname(C.int(fd))
 	if errno != nil {
 		return "", fmt.Errorf("console.TTYName: %s", errno)
@@ -237,7 +240,7 @@ const (
 	d_COLUMN = 80
 )
 
-// GetSize gets the number of rows and columns of the window or terminal.
+// GetSize gets the number of rows and columns of the window or console.
 // In the first is used WinSize(), else it is tried using the environment
 // variables, and lastly returns values by default.
 func GetSize(fd int) (row, column int) {
@@ -302,7 +305,7 @@ func WinSize(fd int) (*Winsize, error) {
 	return ws, nil
 }
 
-// GetSize gets the number of rows and columns of the actual window or terminal.
+// GetSize gets the number of rows and columns of the actual window or console.
 func (t *Console) GetSize() (row, column int) {
 	return GetSize(t.Fd)
 }

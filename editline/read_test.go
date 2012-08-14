@@ -13,8 +13,8 @@ import (
 	"github.com/kless/console"
 )
 
-func TestSReadSingle(t *testing.T) {
-	term, _ := console.New(syscall.Stderr)
+func TestCharMode(t *testing.T) {
+	con, _ := console.New(syscall.Stderr)
 	fmt.Println("\n== Terminal")
 
 	// == Read single key
@@ -33,14 +33,14 @@ func TestSReadSingle(t *testing.T) {
 		}()
 	}
 
-	term.ModeChar()
+	con.SetCharMode()
 	rune, _ := ReadKey("\n + Mode on single character: ")
 	fmt.Printf("\n  pressed: %q\n", string(rune))
-	term.Restore()
+	con.Restore()
 
 	// == Echo
-	//term.Echo(false)
+	//con.Echo(false)
 	// TODO: add password
 
-	//term.Echo(true)
+	//con.Echo(true)
 }

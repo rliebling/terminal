@@ -86,7 +86,7 @@ type Line struct {
 	ps2        string   // Command continuations
 	buf        *buffer  // Text buffer
 	hist       *history // History file
-	cons       *console.Console
+	con        *console.Console
 }
 
 // NewLine returns a line using both prompts ps1 and ps2, and setting the TTY to
@@ -94,16 +94,16 @@ type Line struct {
 // lenAnsi is the length of ANSI codes that the prompt ps1 could have.
 // If the history is nil then it is not used.
 func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
-	cons, err := console.New(InputFd)
+	con, err := console.New(InputFd)
 	if err != nil {
 		return nil, err
 	}
-	if err = cons.MakeRaw(); err != nil {
+	if err = con.MakeRaw(); err != nil {
 		return nil, err
 	}
 
 	lenPS1 := len(ps1) - lenAnsi
-	_, col := cons.GetSize()
+	_, col := con.GetSize()
 
 	buf := newBuffer(lenPS1, col)
 	buf.insertRunes([]rune(ps1))
@@ -115,7 +115,7 @@ func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
 		ps2,
 		buf,
 		hist,
-		cons,
+		con,
 	}, nil
 }
 
@@ -123,15 +123,15 @@ func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
 // the TTY to raw mode.
 // If the history is nil then it is not used.
 func NewDefaultLine(hist *history) (*Line, error) {
-	cons, err := console.New(InputFd)
+	con, err := console.New(InputFd)
 	if err != nil {
 		return nil, err
 	}
-	if err = cons.MakeRaw(); err != nil {
+	if err = con.MakeRaw(); err != nil {
 		return nil, err
 	}
 
-	_, col := cons.GetSize()
+	_, col := con.GetSize()
 
 	buf := newBuffer(len(_PS1), col)
 	buf.insertRunes([]rune(_PS1))
@@ -143,13 +143,13 @@ func NewDefaultLine(hist *history) (*Line, error) {
 		_PS2,
 		buf,
 		hist,
-		cons,
+		con,
 	}, nil
 }
 
 // Restore restores the console settings, so it is disabled the raw mode.
 func (ln *Line) Restore() {
-	ln.cons.Restore()
+	ln.con.Restore()
 }
 
 // Read reads charactes from input to write them to output, enabling line editing.
@@ -175,7 +175,7 @@ func (ln *Line) Read() (line string, err error) {
 		for {
 			select {
 			case <-console.WinSizeChan: // Wait for.
-				_, ln.buf.columns = ln.cons.GetSize()
+				_, ln.buf.columns = ln.con.GetSize()
 				ln.buf.refresh()
 			}
 		}

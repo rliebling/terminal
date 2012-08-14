@@ -49,9 +49,9 @@ type Question struct {
 	falseString string
 	extraBool   map[string]bool // to pass it to validate.Atob
 
-	// To restore terminal original settings
-	termFd    int
-	termState *console.State
+	// To restore the console original settings
+	conFd    int
+	conState console.State
 }
 
 // New returns a Question with the given arguments.
@@ -123,7 +123,7 @@ func NewDefault() *Question {
 
 // Restore restores terminal settings.
 func (q *Question) Restore() error {
-	if err := console.Restore(q.termFd, q.termState); err != nil {
+	if err := console.Restore(q.conFd, q.conState); err != nil {
 		return err
 	}
 	return nil

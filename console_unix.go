@@ -4,9 +4,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// +build !windows
-
 /* Reference: man termios */
+
+// +build darwin freebsd linux netbsd openbsd
 
 package console
 
@@ -32,8 +32,8 @@ type Console struct {
 	IsRawMode  bool
 
 	// Contains the state of a console
-	oldState *_Ctype_struct_termios // in order to restore the original settings
-	newState *_Ctype_struct_termios
+	oldState *C.struct_termios // in order to restore the original settings
+	newState *C.struct_termios
 }
 
 // New creates a new console interface in the file descriptor.
@@ -42,13 +42,13 @@ func New(fd int) (*Console, error) {
 	t := new(Console)
 
 	// Get the actual state
-	t.newState = new(_Ctype_struct_termios)
+	t.newState = new(C.struct_termios)
 	if err := tcgetattr(fd, t.newState); err != nil {
 		return nil, err
 	}
 
 	// The actual state is copied to another one
-	t.oldState = new(_Ctype_struct_termios)
+	t.oldState = new(C.struct_termios)
 	*t.oldState = *t.newState
 
 	t.Fd = fd
@@ -68,7 +68,7 @@ func (t *Console) MakeRaw() error {
 		return nil
 	}
 
-	// It is based in the C call: void cfmakeraw(struct termios *termios_p)
+	// Based in the system call: void cfmakeraw(struct termios *termios_p)
 
 	// Input modes - no break, no CR to NL, no NL to CR, no carriage return,
 	// no strip char, no start/stop output control, no parity check.
@@ -131,7 +131,7 @@ func (t *Console) ModeChar() error {
 // * * *
 
 // tcgetattr gets the console state.
-func tcgetattr(fd int, state *_Ctype_struct_termios) error {
+func tcgetattr(fd int, state *C.struct_termios) error {
 	// int tcgetattr(int fd, struct termios *termios_p);
 	exitCode, errno := C.tcgetattr(C.int(fd), state)
 	if exitCode == 0 {
@@ -141,7 +141,7 @@ func tcgetattr(fd int, state *_Ctype_struct_termios) error {
 }
 
 // tcsetattr sets the console state.
-func tcsetattr(fd, optional_actions int, state *_Ctype_struct_termios) error {
+func tcsetattr(fd, optional_actions int, state *C.struct_termios) error {
 	// int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
 	exitCode, errno := C.tcsetattr(C.int(fd), C.int(optional_actions), state)
 	if exitCode == 0 {
@@ -159,7 +159,7 @@ func (t *Console) tcsetattr(optional_actions int) error {
 //
 
 type State struct {
-	wrap *_Ctype_struct_termios
+	wrap *C.struct_termios
 }
 
 // OriginalState returns the console's original state.
@@ -276,10 +276,19 @@ func GetSize(fd int) (row, column int) {
 	return int(ws.Row), int(ws.Col)
 }
 
+// The winsize structure is defined in Linux in "termios.h".
+// But it is the same in system Darwin.
+type Winsize struct {
+	Row    uint16
+	Col    uint16
+	Xpixel uint16
+	Ypixel uint16
+}
+
 // WinSize gets the window size.
 // It is used the TIOCGWINSZ ioctl() call on the tty device.
-func WinSize(fd int) (*winsize, error) {
-	ws := new(winsize) // def_$(OS).go
+func WinSize(fd int) (*Winsize, error) {
+	ws := new(Winsize)
 
 	r1, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
 		uintptr(fd),
@@ -299,7 +308,7 @@ func (t *Console) GetSize() (row, column int) {
 }
 
 // WinSize gets the window size of the actual window.
-func (t *Console) WinSize() (*winsize, error) {
+func (t *Console) WinSize() (*Winsize, error) {
 	return WinSize(t.Fd)
 }
 

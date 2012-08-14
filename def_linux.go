@@ -3,16 +3,7 @@
 
 package console
 
-// /usr/include/asm-generic/ioctls.h
-const (
-	_TIOCGWINSZ = 0x5413
-	_TIOCSWINSZ = 0x5414
-)
+// #include <asm-generic/ioctls.h>
+import "C"
 
-// /usr/include/asm-generic/termios.h
-type winsize struct {
-	Row    uint16
-	Col    uint16
-	Xpixel uint16
-	Ypixel uint16
-}
+const _TIOCGWINSZ = C.TIOCGWINSZ

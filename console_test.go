@@ -4,10 +4,10 @@
 package console
 
 import (
-	"fmt"
+//	"fmt"
 	"syscall"
 	"testing"
-	"time"
+//	"time"
 )
 
 func TestRawMode(t *testing.T) {
@@ -19,7 +19,17 @@ func TestRawMode(t *testing.T) {
 	if err = con.MakeRaw(); err != nil {
 		t.Error("expected set raw mode:", err)
 	}
-	if err = con.Restore(); err != nil {
+
+
+	if err = con.SetEcho(false); err != nil {
+		t.Error("expected to turn the echo mode:", err)
+	}
+	if err = con.SetEcho(true); err != nil {
+		t.Error("expected to turn the echo mode:", err)
+	}
+
+
+/*	if err = con.Restore(); err != nil {
 		t.Error("expected to restore:", err)
 	}
 
@@ -32,9 +42,9 @@ func TestRawMode(t *testing.T) {
 	}
 	if err = Restore(con.Fd, state); err != nil {
 		t.Error("expected to restore from saved state:", err)
-	}
+	}*/
 }
-
+/*
 func TestInformation(t *testing.T) {
 	con, _ := New(syscall.Stderr)
 	defer con.Restore()
@@ -91,3 +101,4 @@ func TestSize(t *testing.T) {
 		t.Error("the window size got the same value")
 	}
 }
+*/

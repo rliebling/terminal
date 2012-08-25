@@ -10,7 +10,8 @@ Package console provides a portable interface for console I/O.
 
 ## Status
 
-Active: working to be cross-platform
+Active: working to be cross-platform  
+Tested in Linux 3.2.0, FreeBSD 9.0, NetBSD 5.1.2, and OpenBSD systems.
 
 ## License
 

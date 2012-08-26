@@ -4,14 +4,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-/* Reference: man termios */
-
 // +build darwin freebsd linux netbsd openbsd
 
 package console
 
 // #include <termios.h>
-// #include <unistd.h>
 import "C"
 
 import (
@@ -25,7 +22,7 @@ import (
 
 // A Console represents a general console interface.
 type Console struct {
-	Fd int // file descriptor
+	fd int // file descriptor
 
 	// To checking if restore is needed
 	isNewState bool
@@ -51,7 +48,7 @@ func New(fd int) (*Console, error) {
 	co.oldState = new(C.struct_termios)
 	*co.oldState = *co.newState
 
-	co.Fd = fd
+	co.fd = fd
 	return co, nil
 }
 
@@ -81,9 +78,9 @@ func (co *Console) MakeRaw() error {
 // SetEcho turns the echo mode.
 func (co *Console) SetEcho(echo bool) error {
 	if !echo {
-		co.newState.c_lflag &^= (C.ECHO)
+		co.newState.c_lflag &^= C.ECHO
 	} else {
-		co.newState.c_lflag |= (C.ECHO)
+		co.newState.c_lflag |= C.ECHO
 	}
 
 	if err := co.tcsetattr(C.TCSANOW); err != nil {
@@ -107,35 +104,9 @@ func (co *Console) SetCharMode() error {
 	return nil
 }
 
-// * * *
-
-// tcgetattr gets the console state.
-//
-// C function:
-// int tcgetattr(int fd, struct termios *termios_p)
-func tcgetattr(fd int, state *C.struct_termios) error {
-	exitCode, errno := C.tcgetattr(C.int(fd), state)
-	if exitCode == 0 {
-		return nil
-	}
-	return fmt.Errorf("console.tcgetattr: %s", errno)
-}
-
-// tcsetattr sets the console state.
-//
-// C function:
-// int tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
-func tcsetattr(fd, actions int, state *C.struct_termios) error {
-	exitCode, errno := C.tcsetattr(C.int(fd), C.int(actions), state)
-	if exitCode == 0 {
-		return nil
-	}
-	return fmt.Errorf("console.tcsetattr: %s", errno)
-}
-
 // tcsetattr sets the console state; use arguments from Console.
 func (co *Console) tcsetattr(actions int) error {
-	return tcsetattr(co.Fd, actions, co.newState)
+	return tcsetattr(co.fd, actions, co.newState)
 }
 
 // == Restore
@@ -191,32 +162,6 @@ func CheckANSI() bool {
 	}
 	return true
 }
-
-// IsTTY determines if the device is a console.
-//
-// C function:
-// int isatty(int fd)
-func IsTTY(fd int) (bool, error) {
-	exitCode, errno := C.isatty(C.int(fd))
-	if exitCode == 1 {
-		return true, nil
-	}
-	return false, fmt.Errorf("console.IsTTY: %s", errno)
-}
-
-// TTYName gets the name of a console.
-//
-// C function:
-// char *ttyname(int fd)
-func TTYName(fd int) (string, error) {
-	name, errno := C.ttyname(C.int(fd))
-	if errno != nil {
-		return "", fmt.Errorf("console.TTYName: %s", errno)
-	}
-	return C.GoString(name), nil
-}
-
-// * * *
 
 // Default values
 const (
@@ -291,12 +236,12 @@ func WinSize(fd int) (*Winsize, error) {
 
 // GetSize gets the number of rows and columns of the actual window or console.
 func (co *Console) GetSize() (row, column int) {
-	return GetSize(co.Fd)
+	return GetSize(co.fd)
 }
 
 // WinSize gets the window size of the actual window.
 func (co *Console) WinSize() (*Winsize, error) {
-	return WinSize(co.Fd)
+	return WinSize(co.fd)
 }
 
 // == Utility

@@ -4,10 +4,10 @@
 package console
 
 import (
-	"fmt"
+//	"fmt"
 	"syscall"
 	"testing"
-	"time"
+//	"time"
 )
 
 func TestRawMode(t *testing.T) {
@@ -38,11 +38,11 @@ func TestRawMode(t *testing.T) {
 	if err = con.SetEcho(false); err != nil {
 		t.Error("expected to turn the echo mode:", err)
 	}
-	if err = Restore(con.Fd, state); err != nil {
+	if err = Restore(con.fd, state); err != nil {
 		t.Error("expected to restore from saved state:", err)
 	}
 }
-
+/*
 func TestInformation(t *testing.T) {
 	con, _ := New(syscall.Stderr)
 	defer con.Restore()
@@ -51,12 +51,12 @@ func TestInformation(t *testing.T) {
 		t.Error("expected to support this terminal")
 	}
 
-	_, err := IsTTY(con.Fd)
+	_, err := IsTTY(con.fd)
 	if err != nil {
 		t.Error("expected to be a terminal")
 	}
 
-	if _, err = TTYName(con.Fd); err != nil {
+	if _, err = TTYName(con.fd); err != nil {
 		t.Error("expected to get the terminal name", err)
 	}
 }
@@ -98,4 +98,4 @@ func TestSize(t *testing.T) {
 	if ws.Row == ws2.Row || ws.Col == ws2.Col {
 		t.Error("the window size got the same value")
 	}
-}
+}*/

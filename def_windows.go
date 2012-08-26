@@ -5,8 +5,9 @@
 
 package console
 
+// == wincon.h
+
 const (
-	// wincon.h
 	_ENABLE_LINE_INPUT         = 2
 	_ENABLE_ECHO_INPUT         = 4
 	_ENABLE_PROCESSED_INPUT    = 1
@@ -19,3 +20,39 @@ const (
 	_ENABLE_PROCESSED_OUTPUT   = 1
 	_ENABLE_WRAP_AT_EOL_OUTPUT = 2
 )
+
+// typedef struct _SMALL_RECT {
+//	SHORT Left;
+//	SHORT Top;
+//	SHORT Right;
+//	SHORT Bottom;
+// } SMALL_RECT, *PSMALL_RECT;
+
+type smallRect struct {
+	left, top, right, bottom int16
+}
+
+// typedef struct _COORD {
+//	SHORT X;
+//	SHORT Y;
+// } COORD, *PCOORD;
+
+type coord struct {
+	x, y int16
+}
+
+// typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
+//	COORD	dwSize;
+//	COORD	dwCursorPosition;
+//	WORD	wAttributes;
+//	SMALL_RECT srWindow;
+//	COORD	dwMaximumWindowSize;
+// } CONSOLE_SCREEN_BUFFER_INFO,*PCONSOLE_SCREEN_BUFFER_INFO;
+
+type consoleScreenBufferInfo struct {
+	dwSize              coord
+	dwCursorPosition    coord
+	wAttributes         uint16
+	srWindow            smallRect
+	dwMaximumWindowSize coord
+}

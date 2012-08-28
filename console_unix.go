@@ -8,29 +8,29 @@
 
 package console
 
-// #include <termios.h>
-import "C"
-
 import (
 	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
-	"unsafe"
 )
+
+//cgo termios struct_termios
 
 // A Console represents a general console interface.
 type Console struct {
 	fd int // file descriptor
+
+	width, height int
 
 	// To checking if restore is needed
 	isNewState bool
 	IsRawMode  bool
 
 	// Contains the state of a console
-	oldState *C.struct_termios // in order to restore the original settings
-	newState *C.struct_termios
+	oldState *termios // in order to restore the original settings
+	newState *termios
 }
 
 // New creates a new console interface in the file descriptor.
@@ -39,13 +39,13 @@ func New(fd int) (*Console, error) {
 	co := new(Console)
 
 	// Get the actual state
-	co.newState = new(C.struct_termios)
+	co.newState = new(termios)
 	if err := tcgetattr(fd, co.newState); err != nil {
 		return nil, err
 	}
 
 	// The actual state is copied to another one
-	co.oldState = new(C.struct_termios)
+	co.oldState = new(termios)
 	*co.oldState = *co.newState
 
 	co.fd = fd
@@ -54,6 +54,10 @@ func New(fd int) (*Console, error) {
 
 // == Modes
 //
+
+//cgo BRKINT, IGNBRK, ICRNL, INLCR, IGNCR, ISTRIP, IXON, PARMRK
+//cgo OPOST, ECHO, ECHONL, ICANON, IEXTEN, ISIG
+//cgo CSIZE, PARENB, CS8, VMIN, VTIME
 
 // MakeRaw sets the console to something like the "raw" mode. Input is available
 // character by character, echoing is disabled, and all special processing of
@@ -65,10 +69,29 @@ func (co *Console) MakeRaw() error {
 		return nil
 	}
 
-	C.cfmakeraw(co.newState)
+	// Input modes - no break, no CR to NL, no NL to CR, no carriage return,
+	// no strip char, no start/stop output control, no parity check.
+	co.newState.Iflag &^= (BRKINT | IGNBRK | ICRNL | INLCR | IGNCR |
+	ISTRIP | IXON | PARMRK)
+
+	// Output modes - disable post processing.
+	co.newState.Oflag &^= (OPOST)
+
+	// Local modes - echoing off, canonical off, no extended functions,
+	// no signal chars (^Z,^C).
+	co.newState.Lflag &^= (ECHO | ECHONL | ICANON | IEXTEN | ISIG)
+
+	// Control modes - set 8 bit chars.
+	co.newState.Cflag &^= (CSIZE | PARENB)
+	co.newState.Cflag |= (CS8)
+
+	// Control chars - set return condition: min number of bytes and timer.
+	// We want read to return every single byte, without timeout.
+	co.newState.Cc[VMIN] = 1 // Read returns when one char is available.
+	co.newState.Cc[VTIME] = 0
 
 	// Put the console in raw mode after flushing
-	if err := co.tcsetattr(C.TCSAFLUSH); err != nil {
+	if err := tcsetattr(co.fd, TCSAFLUSH, co.newState); err != nil {
 		return fmt.Errorf("console: could not set raw mode: %s", err)
 	}
 	co.IsRawMode = true
@@ -78,12 +101,12 @@ func (co *Console) MakeRaw() error {
 // SetEcho turns the echo mode.
 func (co *Console) SetEcho(echo bool) error {
 	if !echo {
-		co.newState.c_lflag &^= C.ECHO
+		co.newState.Lflag &^= (ECHO)
 	} else {
-		co.newState.c_lflag |= C.ECHO
+		co.newState.Lflag |= (ECHO)
 	}
 
-	if err := co.tcsetattr(C.TCSANOW); err != nil {
+	if err := tcsetattr(co.fd, TCSANOW, co.newState); err != nil {
 		return fmt.Errorf("console: could not turn echo mode: %s", err)
 	}
 	co.isNewState = true
@@ -93,27 +116,22 @@ func (co *Console) SetEcho(echo bool) error {
 // SetCharMode sets the console to single-character mode.
 func (co *Console) SetCharMode() error {
 	// Disable canonical mode, and set buffer size to 1 byte.
-	co.newState.c_lflag &^= (C.ICANON)
-	co.newState.c_cc[C.VTIME] = 0
-	co.newState.c_cc[C.VMIN] = 1
+	co.newState.Lflag &^= (ICANON)
+	co.newState.Cc[VTIME] = 0
+	co.newState.Cc[VMIN] = 1
 
-	if err := co.tcsetattr(C.TCSANOW); err != nil {
+	if err := tcsetattr(co.fd, TCSANOW, co.newState); err != nil {
 		return fmt.Errorf("console: could not set single-character mode: %s", err)
 	}
 	co.isNewState = true
 	return nil
 }
 
-// tcsetattr sets the console state; use arguments from Console.
-func (co *Console) tcsetattr(actions int) error {
-	return tcsetattr(co.fd, actions, co.newState)
-}
-
 // == Restore
 //
 
 type State struct {
-	wrap *C.struct_termios
+	wrap *termios
 }
 
 // OriginalState returns the console's original state.
@@ -126,7 +144,7 @@ func (co *Console) Restore() error {
 	if co.IsRawMode || co.isNewState {
 		*co.newState = *co.oldState
 
-		if err := co.tcsetattr(C.TCSANOW); err != nil {
+		if err := tcsetattr(co.fd, TCSANOW, co.newState); err != nil {
 			return fmt.Errorf("console: could not restore: %s", err)
 		}
 		co.IsRawMode = false
@@ -137,7 +155,7 @@ func (co *Console) Restore() error {
 
 // Restore restores the settings from State.
 func Restore(fd int, st State) error {
-	if err := tcsetattr(fd, C.TCSANOW, st.wrap); err != nil {
+	if err := tcsetattr(fd, TCSANOW, st.wrap); err != nil {
 		return fmt.Errorf("console: could not restore: %s", err)
 	}
 	return nil
@@ -163,89 +181,53 @@ func CheckANSI() bool {
 	return true
 }
 
+// == Size
+
+// GetSize gets the number of rows and columns from the kernel.
+func (co *Console) GetSize() (row, column int, err error) {
+	ws, e := getWinsize(co.fd)
+	if e != nil {
+		err = e
+		return
+	}
+	return int(ws.Row), int(ws.Col), nil
+}
+
 // Default values
 const (
 	d_ROW    = 24
 	d_COLUMN = 80
 )
 
-// GetSize gets the number of rows and columns of the window or console.
-// In the first is used WinSize(), else it is tried using the environment
-// variables, and lastly returns values by default.
-func GetSize(fd int) (row, column int) {
-	ws, err := WinSize(fd)
+// GetSizeFromEnv gets the number of rows and columns through environment
+// variables, else returns default values.
+func (co *Console) GetSizeFromEnv() (row, column int) {
+	sRow := os.Getenv("LINES")
+	sCol := os.Getenv("COLUMNS")
 
-	// If there is any error, then to try get the values through environment.
-	// Else, it is used values by default.
-	if err != nil {
-		sRow := os.Getenv("LINES")
-		sCol := os.Getenv("COLUMNS")
-
-		if sRow == "" {
+	if sRow == "" {
+		row = d_ROW
+	} else {
+		iRow, err := strconv.Atoi(sRow)
+		if err == nil {
+			row = iRow
+		} else {
 			row = d_ROW
-		} else {
-			iRow, err := strconv.Atoi(sRow)
-			if err == nil {
-				row = iRow
-			} else {
-				row = d_ROW
-			}
 		}
+	}
 
-		if sCol == "" {
+	if sCol == "" {
+		column = d_COLUMN
+	} else {
+		iCol, err := strconv.Atoi(sCol)
+		if err == nil {
+			column = iCol
+		} else {
 			column = d_COLUMN
-		} else {
-			iCol, err := strconv.Atoi(sCol)
-			if err == nil {
-				column = iCol
-			} else {
-				column = d_COLUMN
-			}
 		}
-		return
 	}
-
-	return int(ws.Row), int(ws.Col)
+	return
 }
-
-// The winsize structure is defined in Linux in "termios.h".
-// But it is the same in system Darwin.
-type Winsize struct {
-	Row    uint16
-	Col    uint16
-	Xpixel uint16
-	Ypixel uint16
-}
-
-// WinSize gets the window size.
-// It is used the TIOCGWINSZ ioctl() call on the tty device.
-func WinSize(fd int) (*Winsize, error) {
-	ws := new(Winsize)
-
-	r1, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(_TIOCGWINSZ),
-		uintptr(unsafe.Pointer(ws)),
-	)
-
-	if int(r1) == -1 {
-		return nil, os.NewSyscallError("WinSize", errno)
-	}
-	return ws, nil
-}
-
-// GetSize gets the number of rows and columns of the actual window or console.
-func (co *Console) GetSize() (row, column int) {
-	return GetSize(co.fd)
-}
-
-// WinSize gets the window size of the actual window.
-func (co *Console) WinSize() (*Winsize, error) {
-	return WinSize(co.fd)
-}
-
-// == Utility
-//
 
 var WinSizeChan = make(chan byte, 1) // Allocate a channel for TrapSize()
 

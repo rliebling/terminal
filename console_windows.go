@@ -122,3 +122,21 @@ func Restore(fd syscall.Handle, st State) error {
 	return nil
 }
 
+// == 
+
+type Winsize struct {
+	Row    uint16
+	Col    uint16
+	//Xpixel uint16
+	//Ypixel uint16
+}
+
+func (co *Console) GetSize() (*Winsize, error) {
+	info := new(consoleScreenBufferInfo)
+
+	if err := getConsoleScreenBufferInfo(co.fd, &info); err != nil {
+		return nil, os.NewSyscallError("getConsoleScreenBufferInfo", err)
+	}
+	return WinSize{info.dwSize.x, info.dwSize.y}, nil
+}
+

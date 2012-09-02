@@ -3,9 +3,8 @@
 
 // +build ignore
 
+/* Reference: man tty_ioctl */
+
 package console
 
-//cgo const TCGETS = TIOCGETA
-//cgo const TCSETS = TIOCSETA
-//cgo const TCSETSW = TIOCSETAW
-//cgo const TCSETSF = TIOCSETAF
+//cgo const (TCGETS, TCSETS, TCSETSW, TCSETSF)

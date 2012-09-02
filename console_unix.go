@@ -16,7 +16,7 @@ import (
 	"syscall"
 )
 
-//cgo termios struct_termios
+//cgo type struct_termios
 
 // A Console represents a general console interface.
 type Console struct {
@@ -55,9 +55,9 @@ func New(fd int) (*Console, error) {
 // == Modes
 //
 
-//cgo BRKINT, IGNBRK, ICRNL, INLCR, IGNCR, ISTRIP, IXON, PARMRK
-//cgo OPOST, ECHO, ECHONL, ICANON, IEXTEN, ISIG
-//cgo CSIZE, PARENB, CS8, VMIN, VTIME
+//cgo const (BRKINT, IGNBRK, ICRNL, INLCR, IGNCR, ISTRIP, IXON, PARMRK)
+//cgo const (OPOST, ECHO, ECHONL, ICANON, IEXTEN, ISIG)
+//cgo const (CSIZE, PARENB, CS8, VMIN, VTIME)
 
 // MakeRaw sets the console to something like the "raw" mode. Input is available
 // character by character, echoing is disabled, and all special processing of
@@ -71,27 +71,27 @@ func (co *Console) MakeRaw() error {
 
 	// Input modes - no break, no CR to NL, no NL to CR, no carriage return,
 	// no strip char, no start/stop output control, no parity check.
-	co.newState.Iflag &^= (BRKINT | IGNBRK | ICRNL | INLCR | IGNCR |
-	ISTRIP | IXON | PARMRK)
+	co.newState.Iflag &^= (_BRKINT | _IGNBRK | _ICRNL | _INLCR | _IGNCR |
+		_ISTRIP | _IXON | _PARMRK)
 
 	// Output modes - disable post processing.
-	co.newState.Oflag &^= (OPOST)
+	co.newState.Oflag &^= (_OPOST)
 
 	// Local modes - echoing off, canonical off, no extended functions,
 	// no signal chars (^Z,^C).
-	co.newState.Lflag &^= (ECHO | ECHONL | ICANON | IEXTEN | ISIG)
+	co.newState.Lflag &^= (_ECHO | _ECHONL | _ICANON | _IEXTEN | _ISIG)
 
 	// Control modes - set 8 bit chars.
-	co.newState.Cflag &^= (CSIZE | PARENB)
-	co.newState.Cflag |= (CS8)
+	co.newState.Cflag &^= (_CSIZE | _PARENB)
+	co.newState.Cflag |= (_CS8)
 
 	// Control chars - set return condition: min number of bytes and timer.
 	// We want read to return every single byte, without timeout.
-	co.newState.Cc[VMIN] = 1 // Read returns when one char is available.
-	co.newState.Cc[VTIME] = 0
+	co.newState.Cc[_VMIN] = 1 // Read returns when one char is available.
+	co.newState.Cc[_VTIME] = 0
 
 	// Put the console in raw mode after flushing
-	if err := tcsetattr(co.fd, TCSAFLUSH, co.newState); err != nil {
+	if err := tcsetattr(co.fd, _TCSAFLUSH, co.newState); err != nil {
 		return fmt.Errorf("console: could not set raw mode: %s", err)
 	}
 	co.IsRawMode = true
@@ -101,12 +101,12 @@ func (co *Console) MakeRaw() error {
 // SetEcho turns the echo mode.
 func (co *Console) SetEcho(echo bool) error {
 	if !echo {
-		co.newState.Lflag &^= (ECHO)
+		co.newState.Lflag &^= (_ECHO)
 	} else {
-		co.newState.Lflag |= (ECHO)
+		co.newState.Lflag |= (_ECHO)
 	}
 
-	if err := tcsetattr(co.fd, TCSANOW, co.newState); err != nil {
+	if err := tcsetattr(co.fd, _TCSANOW, co.newState); err != nil {
 		return fmt.Errorf("console: could not turn echo mode: %s", err)
 	}
 	co.isNewState = true
@@ -116,11 +116,11 @@ func (co *Console) SetEcho(echo bool) error {
 // SetCharMode sets the console to single-character mode.
 func (co *Console) SetCharMode() error {
 	// Disable canonical mode, and set buffer size to 1 byte.
-	co.newState.Lflag &^= (ICANON)
-	co.newState.Cc[VTIME] = 0
-	co.newState.Cc[VMIN] = 1
+	co.newState.Lflag &^= (_ICANON)
+	co.newState.Cc[_VTIME] = 0
+	co.newState.Cc[_VMIN] = 1
 
-	if err := tcsetattr(co.fd, TCSANOW, co.newState); err != nil {
+	if err := tcsetattr(co.fd, _TCSANOW, co.newState); err != nil {
 		return fmt.Errorf("console: could not set single-character mode: %s", err)
 	}
 	co.isNewState = true
@@ -144,7 +144,7 @@ func (co *Console) Restore() error {
 	if co.IsRawMode || co.isNewState {
 		*co.newState = *co.oldState
 
-		if err := tcsetattr(co.fd, TCSANOW, co.newState); err != nil {
+		if err := tcsetattr(co.fd, _TCSANOW, co.newState); err != nil {
 			return fmt.Errorf("console: could not restore: %s", err)
 		}
 		co.IsRawMode = false
@@ -155,7 +155,7 @@ func (co *Console) Restore() error {
 
 // Restore restores the settings from State.
 func Restore(fd int, st State) error {
-	if err := tcsetattr(fd, TCSANOW, st.wrap); err != nil {
+	if err := tcsetattr(fd, _TCSANOW, st.wrap); err != nil {
 		return fmt.Errorf("console: could not restore: %s", err)
 	}
 	return nil

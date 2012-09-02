@@ -16,28 +16,28 @@ import (
 	"unsafe"
 )
 
-//cgo TCGETS, TCSETS, TCSETSW, TCSETSF, TCSANOW, TCSADRAIN, TCSAFLUSH
+//cgo const (TCSANOW, TCSADRAIN, TCSAFLUSH)
 
 //C	int tcgetattr(int fd, struct termios *termios_p)
 //C	int tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
 
 func tcgetattr(fd int, state *termios) (err error) {
 	_, _, e1 := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
-		uintptr(TCGETS), uintptr(unsafe.Pointer(state)))
+		uintptr(_TCGETS), uintptr(unsafe.Pointer(state)))
 	if e1 != 0 {
 		err = e1
 	}
 	return
 }
 
-func tcsetattr(fd int, action int, state *termios) (err error) {
+func tcsetattr(fd int, action uint, state *termios) (err error) {
 	switch action {
-	case TCSANOW:
-		action = TCSETS
-	case TCSADRAIN:
-		action = TCSETSW
-	case TCSAFLUSH:
-		action = TCSETSF
+	case _TCSANOW:
+		action = _TCSETS
+	case _TCSADRAIN:
+		action = _TCSETSW
+	case _TCSAFLUSH:
+		action = _TCSETSF
 	}
 
 	_, _, e1 := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
@@ -89,13 +89,14 @@ func TTYName(fd int) (string, error) {
 
 // * * *
 
-//cgo TIOCGWINSZ
+//cgo const TIOCGWINSZ
+//cgo type struct_winsize
 
 // getWinsize returns the winsize struct with the console size set by the kernel.
 // It is used the TIOCGWINSZ ioctl() call on the tty device.
 func getWinsize(fd int) (ws *winsize, err error) {
 	_, _, e1 := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
-		uintptr(TIOCGWINSZ), uintptr(unsafe.Pointer(&ws)))
+		uintptr(_TIOCGWINSZ), uintptr(unsafe.Pointer(&ws)))
 	if e1 != 0 {
 		err = e1
 	}

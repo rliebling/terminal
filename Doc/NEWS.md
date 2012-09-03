@@ -1,6 +1,6 @@
 ###### Notice
 
-*This file documents the changes in **Console** versions that are listed below.*
+*This file documents the changes in **Terminal** versions that are listed below.*
 
 *Items should be added to this file as:*
 

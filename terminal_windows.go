@@ -11,7 +11,7 @@
 //sys setConsoleMode(handle syscall.Handle, mode uint32) (err error) = SetConsoleMode
 //sys getConsoleScreenBufferInfo(handle syscall.Handle, info *consoleScreenBufferInfo) (err error) = GetConsoleScreenBufferInfo
 
-package console
+package terminal
 
 import (
 	"fmt"
@@ -25,12 +25,12 @@ type Console struct {
 	isNewState bool
 	isRawMode  bool
 
-	// Contains the state of a console
+	// Contains the state of a terminal
 	oldState uint32
 	newState uint32
 }
 
-// New creates a new console interface in the file descriptor.
+// New creates a new terminal interface in the file descriptor.
 func New(fd syscall.Handle) (*Console, error) {
 	co := new(Console)
 
@@ -49,9 +49,9 @@ func New(fd syscall.Handle) (*Console, error) {
 // == Modes
 //
 
-// MakeRaw sets the console to something like the "raw" mode. Input is available
+// MakeRaw sets the terminal to something like the "raw" mode. Input is available
 // character by character, echoing is disabled, and all special processing of
-// console input and output characters is disabled.
+// terminal input and output characters is disabled.
 //
 // NOTE: in tty "raw mode", CR+LF is used for output and CR is used for input.
 func (co *Console) MakeRaw() error {
@@ -62,9 +62,9 @@ func (co *Console) MakeRaw() error {
 	co.newState = 0
 	co.newState &^= _ENABLE_LINE_INPUT | _ENABLE_ECHO_INPUT | _ENABLE_PROCESSED_INPUT | _ENABLE_WINDOW_INPUT
 
-	// Put the console in raw mode
+	// Put the terminal in raw mode
 	if err := setConsoleMode(co.fd, co.newState); err != nil {
-		return fmt.Errorf("console: could not set raw mode: %s", err)
+		return fmt.Errorf("terminal: could not set raw mode: %s", err)
 	}
 
 	co.isRawMode = true
@@ -76,7 +76,7 @@ func (co *Console) SetEcho(echo bool) error {
 	if !echo {
 		co.newState &^= _ENABLE_ECHO_INPUT
 	} else {
-		co.newState &= _ENABLE_ECHO_INPUT|_ENABLE_LINE_INPUT
+		co.newState &= _ENABLE_ECHO_INPUT | _ENABLE_LINE_INPUT
 	}
 
 	if err := setConsoleMode(co.fd, co.newState); err != nil {
@@ -84,7 +84,7 @@ func (co *Console) SetEcho(echo bool) error {
 		if !echo {
 			ok = "off"
 		}
-		return fmt.Errorf("console: could not turn %s echo mode: %s", ok, err)
+		return fmt.Errorf("terminal: could not turn %s echo mode: %s", ok, err)
 	}
 	co.isNewState = true
 	return nil
@@ -95,18 +95,18 @@ func (co *Console) SetEcho(echo bool) error {
 
 type State uint32
 
-// OriginalState returns the console's original state.
+// OriginalState returns the terminal's original state.
 func (co *Console) OriginalState() State {
 	return State(co.oldState)
 }
 
-// Restore restores the original settings for the console.
+// Restore restores the original settings for the terminal.
 func (co *Console) Restore() error {
 	if co.isRawMode || co.isNewState {
 		co.newState = co.oldState
 
 		if err := setConsoleMode(co.fd, co.newState); err != nil {
-			return fmt.Errorf("console: could not restore: %s", err)
+			return fmt.Errorf("terminal: could not restore: %s", err)
 		}
 		co.isRawMode = false
 		co.isNewState = false
@@ -117,7 +117,7 @@ func (co *Console) Restore() error {
 // Restore restores the settings from State.
 func Restore(fd syscall.Handle, st State) error {
 	if err := setConsoleMode(fd, uint32(st)); err != nil {
-		return fmt.Errorf("console: could not restore: %s", err)
+		return fmt.Errorf("terminal: could not restore: %s", err)
 	}
 	return nil
 }
@@ -127,8 +127,8 @@ func Restore(fd syscall.Handle, st State) error {
 type Winsize struct {
 	Row    uint16
 	Col    uint16
-	//Xpixel uint16
-	//Ypixel uint16
+	Xpixel uint16
+	Ypixel uint16
 }
 
 func (co *Console) GetSize() (*Winsize, error) {
@@ -139,4 +139,3 @@ func (co *Console) GetSize() (*Winsize, error) {
 	}
 	return WinSize{info.dwSize.x, info.dwSize.y}, nil
 }
-

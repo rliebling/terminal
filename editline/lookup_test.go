@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/kless/console"
+	"github.com/kless/terminal"
 )
 
 func init() {
@@ -27,13 +27,13 @@ func init() {
 
 // TestLookup prints the decimal code at pressing a key.
 func TestLookup(t *testing.T) {
-	ter, err := console.New(InputFd)
+	term, err := terminal.New(InputFd)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ter.Restore()
+	defer term.Restore()
 
-	if err = ter.MakeRaw(); err != nil {
+	if err = term.MakeRaw(); err != nil {
 		t.Error(err)
 	} else {
 		buf := bufio.NewReader(Input)

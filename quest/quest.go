@@ -15,8 +15,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kless/console"
-	"github.com/kless/console/editline"
+	"github.com/kless/terminal"
+	"github.com/kless/terminal/editline"
 	"github.com/kless/validate"
 )
 
@@ -49,9 +49,9 @@ type Question struct {
 	falseString string
 	extraBool   map[string]bool // to pass it to validate.Atob
 
-	// To restore the console original settings
-	conFd    int
-	conState console.State
+	// To restore the terminal original settings
+	termFD    int
+	termState terminal.State
 }
 
 // New returns a Question with the given arguments.
@@ -65,7 +65,7 @@ type Question struct {
 //   1, t, T, TRUE, true, True, y, Y, yes, YES, Yes
 //   0, f, F, FALSE, false, False, n, N, no, NO, No
 func New(prefix, errPrefix, trueString, falseString string) *Question {
-	termi, err := console.New(editline.InputFd)
+	term, err := terminal.New(editline.InputFd)
 	if err != nil {
 		panic(err)
 	}
@@ -102,8 +102,8 @@ func New(prefix, errPrefix, trueString, falseString string) *Question {
 		falseString,
 		extraBool,
 
-		termi.Fd,
-		termi.OriginalState(),
+		term.Fd,
+		term.OriginalState(),
 	}
 }
 
@@ -123,7 +123,7 @@ func NewDefault() *Question {
 
 // Restore restores terminal settings.
 func (q *Question) Restore() error {
-	if err := console.Restore(q.conFd, q.conState); err != nil {
+	if err := terminal.Restore(q.termFD, q.termState); err != nil {
 		return err
 	}
 	return nil

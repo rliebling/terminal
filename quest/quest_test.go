@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kless/console/editline"
+	"github.com/kless/terminal/editline"
 )
 
 var (

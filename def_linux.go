@@ -5,6 +5,6 @@
 
 /* Reference: man tty_ioctl */
 
-package console
+package terminal
 
 //cgo const (TCGETS, TCSETS, TCSETSW, TCSETSF)

@@ -1,11 +1,14 @@
-// Any copyright is dedicated to the Public Domain.
-// http://creativecommons.org/publicdomain/zero/1.0/
+// Copyright 2010 Jonas mg
+//
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /* Reference: man termios ; man tty_ioctl */
 
-// +build darwin freebsd linux netbsd openbsd
+// +build !plan9,!windows
 
-package console
+package terminal
 
 // #include <unistd.h>
 import "C"
@@ -16,10 +19,14 @@ import (
 	"unsafe"
 )
 
-//cgo const (TCSANOW, TCSADRAIN, TCSAFLUSH)
+// == System calls
+//
 
-//C	int tcgetattr(int fd, struct termios *termios_p)
-//C	int tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
+//cgo const (TCSANOW, TCSADRAIN, TCSAFLUSH)
+//cgo const TIOCGWINSZ
+//cgo type struct_winsize
+
+//sys	int tcgetattr(int fd, struct termios *termios_p)
 
 func tcgetattr(fd int, state *termios) (err error) {
 	_, _, e1 := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
@@ -29,6 +36,8 @@ func tcgetattr(fd int, state *termios) (err error) {
 	}
 	return
 }
+
+//sys	int tcsetattr(int fd, int optional_actions, const struct termios *termios_p)
 
 func tcsetattr(fd int, action uint, state *termios) (err error) {
 	switch action {
@@ -48,57 +57,34 @@ func tcsetattr(fd int, action uint, state *termios) (err error) {
 	return
 }
 
-/*// tcgetattr gets the console state.
-func tcgetattr(fd int, state *C.struct_termios) error {
-	exitCode, errno := C.tcgetattr(C.int(fd), state)
-	if exitCode == 0 {
-		return nil
-	}
-	return fmt.Errorf("console.tcgetattr: %s", errno)
-}
-
-// tcsetattr sets the console state.
-func tcsetattr(fd, actions int, state *C.struct_termios) error {
-	exitCode, errno := C.tcsetattr(C.int(fd), C.int(actions), state)
-	if exitCode == 0 {
-		return nil
-	}
-	return fmt.Errorf("console.tcsetattr: %s", errno)
-}*/
-
-//C	int isatty(int fd)
-//C	char *ttyname(int fd)
-
-// IsTTY determines if the device is a console.
-func IsTTY(fd int) (bool, error) {
-	exitCode, errno := C.isatty(C.int(fd))
-	if exitCode == 1 {
-		return true, nil
-	}
-	return false, fmt.Errorf("console.IsTTY: %s", errno)
-}
-
-// TTYName gets the name of a console.
-func TTYName(fd int) (string, error) {
-	name, errno := C.ttyname(C.int(fd))
-	if errno != nil {
-		return "", fmt.Errorf("console.TTYName: %s", errno)
-	}
-	return C.GoString(name), nil
-}
-
-// * * *
-
-//cgo const TIOCGWINSZ
-//cgo type struct_winsize
-
-// getWinsize returns the winsize struct with the console size set by the kernel.
-// It is used the TIOCGWINSZ ioctl() call on the tty device.
-func getWinsize(fd int) (ws *winsize, err error) {
+// getWinsize gets the winsize struct with the terminal size set by the kernel.
+func getWinsize(fd int, ws *winsize) (err error) {
 	_, _, e1 := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
-		uintptr(_TIOCGWINSZ), uintptr(unsafe.Pointer(&ws)))
+		uintptr(_TIOCGWINSZ), uintptr(unsafe.Pointer(ws)))
 	if e1 != 0 {
 		err = e1
 	}
 	return
+}
+
+// == C library functions
+//
+
+//C	int isatty(int fd)
+// http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/posix/isatty.c
+
+// IsTerminal returns true if the file descriptor is a terminal.
+func IsTerminal(fd int) bool {
+	return tcgetattr(fd, &termios{}) == nil
+}
+
+//C	char *ttyname(int fd)
+
+// TTYName gets the name of a terminal.
+func TTYName(fd int) (string, error) {
+	name, errno := C.ttyname(C.int(fd))
+	if errno != nil {
+		return "", fmt.Errorf("terminal.TTYName: %s", errno)
+	}
+	return C.GoString(name), nil
 }

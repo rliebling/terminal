@@ -3,7 +3,7 @@
 
 /* The Windows headers can be got from directory "MinGW/include" */
 
-package console
+package terminal
 
 // == wincon.h
 

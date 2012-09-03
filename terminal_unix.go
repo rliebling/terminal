@@ -4,9 +4,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// +build darwin freebsd linux netbsd openbsd
+// +build !plan9,!windows
 
-package console
+package terminal
 
 import (
 	"fmt"
@@ -18,8 +18,8 @@ import (
 
 //cgo type struct_termios
 
-// A Console represents a general console interface.
-type Console struct {
+// A Terminal represents a general terminal interface.
+type Terminal struct {
 	fd int // file descriptor
 
 	width, height int
@@ -28,28 +28,28 @@ type Console struct {
 	isNewState bool
 	IsRawMode  bool
 
-	// Contains the state of a console
+	// Contains the state of a terminal
 	oldState *termios // in order to restore the original settings
 	newState *termios
 }
 
-// New creates a new console interface in the file descriptor.
+// New creates a new terminal interface in the file descriptor.
 // Note that 0 is the file descriptor for the standard input.
-func New(fd int) (*Console, error) {
-	co := new(Console)
+func New(fd int) (*Terminal, error) {
+	t := new(Terminal)
 
 	// Get the actual state
-	co.newState = new(termios)
-	if err := tcgetattr(fd, co.newState); err != nil {
+	t.newState = new(termios)
+	if err := tcgetattr(fd, t.newState); err != nil {
 		return nil, err
 	}
 
 	// The actual state is copied to another one
-	co.oldState = new(termios)
-	*co.oldState = *co.newState
+	t.oldState = new(termios)
+	*t.oldState = *t.newState
 
-	co.fd = fd
-	return co, nil
+	t.fd = fd
+	return t, nil
 }
 
 // == Modes
@@ -59,71 +59,71 @@ func New(fd int) (*Console, error) {
 //cgo const (OPOST, ECHO, ECHONL, ICANON, IEXTEN, ISIG)
 //cgo const (CSIZE, PARENB, CS8, VMIN, VTIME)
 
-// MakeRaw sets the console to something like the "raw" mode. Input is available
+// MakeRaw sets the terminal to something like the "raw" mode. Input is available
 // character by character, echoing is disabled, and all special processing of
-// console input and output characters is disabled.
+// terminal input and output characters is disabled.
 //
 // NOTE: in tty "raw mode", CR+LF is used for output and CR is used for input.
-func (co *Console) MakeRaw() error {
-	if co.IsRawMode {
+func (t *Terminal) MakeRaw() error {
+	if t.IsRawMode {
 		return nil
 	}
 
 	// Input modes - no break, no CR to NL, no NL to CR, no carriage return,
 	// no strip char, no start/stop output control, no parity check.
-	co.newState.Iflag &^= (_BRKINT | _IGNBRK | _ICRNL | _INLCR | _IGNCR |
+	t.newState.Iflag &^= (_BRKINT | _IGNBRK | _ICRNL | _INLCR | _IGNCR |
 		_ISTRIP | _IXON | _PARMRK)
 
 	// Output modes - disable post processing.
-	co.newState.Oflag &^= (_OPOST)
+	t.newState.Oflag &^= (_OPOST)
 
 	// Local modes - echoing off, canonical off, no extended functions,
 	// no signal chars (^Z,^C).
-	co.newState.Lflag &^= (_ECHO | _ECHONL | _ICANON | _IEXTEN | _ISIG)
+	t.newState.Lflag &^= (_ECHO | _ECHONL | _ICANON | _IEXTEN | _ISIG)
 
 	// Control modes - set 8 bit chars.
-	co.newState.Cflag &^= (_CSIZE | _PARENB)
-	co.newState.Cflag |= (_CS8)
+	t.newState.Cflag &^= (_CSIZE | _PARENB)
+	t.newState.Cflag |= (_CS8)
 
 	// Control chars - set return condition: min number of bytes and timer.
 	// We want read to return every single byte, without timeout.
-	co.newState.Cc[_VMIN] = 1 // Read returns when one char is available.
-	co.newState.Cc[_VTIME] = 0
+	t.newState.Cc[_VMIN] = 1 // Read returns when one char is available.
+	t.newState.Cc[_VTIME] = 0
 
-	// Put the console in raw mode after flushing
-	if err := tcsetattr(co.fd, _TCSAFLUSH, co.newState); err != nil {
-		return fmt.Errorf("console: could not set raw mode: %s", err)
+	// Put the terminal in raw mode after flushing
+	if err := tcsetattr(t.fd, _TCSAFLUSH, t.newState); err != nil {
+		return fmt.Errorf("terminal: could not set raw mode: %s", err)
 	}
-	co.IsRawMode = true
+	t.IsRawMode = true
 	return nil
 }
 
 // SetEcho turns the echo mode.
-func (co *Console) SetEcho(echo bool) error {
+func (t *Terminal) SetEcho(echo bool) error {
 	if !echo {
-		co.newState.Lflag &^= (_ECHO)
+		t.newState.Lflag &^= (_ECHO)
 	} else {
-		co.newState.Lflag |= (_ECHO)
+		t.newState.Lflag |= (_ECHO)
 	}
 
-	if err := tcsetattr(co.fd, _TCSANOW, co.newState); err != nil {
-		return fmt.Errorf("console: could not turn echo mode: %s", err)
+	if err := tcsetattr(t.fd, _TCSANOW, t.newState); err != nil {
+		return fmt.Errorf("terminal: could not turn echo mode: %s", err)
 	}
-	co.isNewState = true
+	t.isNewState = true
 	return nil
 }
 
-// SetCharMode sets the console to single-character mode.
-func (co *Console) SetCharMode() error {
+// SetCharMode sets the terminal to single-character mode.
+func (t *Terminal) SetCharMode() error {
 	// Disable canonical mode, and set buffer size to 1 byte.
-	co.newState.Lflag &^= (_ICANON)
-	co.newState.Cc[_VTIME] = 0
-	co.newState.Cc[_VMIN] = 1
+	t.newState.Lflag &^= (_ICANON)
+	t.newState.Cc[_VTIME] = 0
+	t.newState.Cc[_VMIN] = 1
 
-	if err := tcsetattr(co.fd, _TCSANOW, co.newState); err != nil {
-		return fmt.Errorf("console: could not set single-character mode: %s", err)
+	if err := tcsetattr(t.fd, _TCSANOW, t.newState); err != nil {
+		return fmt.Errorf("terminal: could not set single-character mode: %s", err)
 	}
-	co.isNewState = true
+	t.isNewState = true
 	return nil
 }
 
@@ -134,21 +134,21 @@ type State struct {
 	wrap *termios
 }
 
-// OriginalState returns the console's original state.
-func (co *Console) OriginalState() State {
-	return State{co.oldState}
+// OriginalState returns the terminal's original state.
+func (t *Terminal) OriginalState() State {
+	return State{t.oldState}
 }
 
-// Restore restores the original settings for the console.
-func (co *Console) Restore() error {
-	if co.IsRawMode || co.isNewState {
-		*co.newState = *co.oldState
+// Restore restores the original settings for the terminal.
+func (t *Terminal) Restore() error {
+	if t.IsRawMode || t.isNewState {
+		*t.newState = *t.oldState
 
-		if err := tcsetattr(co.fd, _TCSANOW, co.newState); err != nil {
-			return fmt.Errorf("console: could not restore: %s", err)
+		if err := tcsetattr(t.fd, _TCSANOW, t.newState); err != nil {
+			return fmt.Errorf("terminal: could not restore: %s", err)
 		}
-		co.IsRawMode = false
-		co.isNewState = false
+		t.IsRawMode = false
+		t.isNewState = false
 	}
 	return nil
 }
@@ -156,7 +156,7 @@ func (co *Console) Restore() error {
 // Restore restores the settings from State.
 func Restore(fd int, st State) error {
 	if err := tcsetattr(fd, _TCSANOW, st.wrap); err != nil {
-		return fmt.Errorf("console: could not restore: %s", err)
+		return fmt.Errorf("terminal: could not restore: %s", err)
 	}
 	return nil
 }
@@ -166,7 +166,7 @@ func Restore(fd int, st State) error {
 
 var unsupportedTerm = []string{"dumb", "cons25"}
 
-// CheckANSI checks if the console supports ANSI escape controls.
+// CheckANSI checks if the terminal supports ANSI escape controls.
 func CheckANSI() bool {
 	term := os.Getenv("TERM")
 	if term == "" {
@@ -184,9 +184,9 @@ func CheckANSI() bool {
 // == Size
 
 // GetSize gets the number of rows and columns from the kernel.
-func (co *Console) GetSize() (row, column int, err error) {
-	ws, e := getWinsize(co.fd)
-	if e != nil {
+func (t *Terminal) GetSize() (row, column int, err error) {
+	ws := new(winsize)
+	if e := getWinsize(t.fd, ws); e != nil {
 		err = e
 		return
 	}
@@ -201,7 +201,7 @@ const (
 
 // GetSizeFromEnv gets the number of rows and columns through environment
 // variables, else returns default values.
-func (co *Console) GetSizeFromEnv() (row, column int) {
+func (t *Terminal) GetSizeFromEnv() (row, column int) {
 	sRow := os.Getenv("LINES")
 	sCol := os.Getenv("COLUMNS")
 

@@ -1,17 +1,18 @@
-Console
-=======
-Package console provides a portable interface for console I/O.
+Terminal
+========
+Package terminal provides a portable interface for terminal I/O.
 
-[Documentation online](http://go.pkgdoc.org/github.com/kless/console)
+[Documentation online](http://go.pkgdoc.org/github.com/kless/terminal)
 
 ## Installation
 
-	go get github.com/kless/console
+	go get github.com/kless/terminal
 
 ## Status
 
-Active: working to be cross-platform  
-Tested in Linux 3.2.0, FreeBSD 9.0, NetBSD 5.1.2, and OpenBSD systems.
+Active: working on to be cross-platform  
+Tested in Linux 3.2.0, FreeBSD 9.0, NetBSD 6.0 RC1, OpenBSD 5.1, and Darwin
+systems, for architecture AMD64.
 
 ## License
 

@@ -53,7 +53,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/kless/console"
+	"github.com/kless/terminal"
 )
 
 // Default values for prompts.
@@ -73,8 +73,8 @@ var (
 var ChanCtrlC = make(chan byte)
 
 func init() {
-	if !console.CheckANSI() {
-		panic("Your console does not support ANSI")
+	if !terminal.CheckANSI() {
+		panic("Your terminal does not support ANSI")
 	}
 }
 
@@ -86,7 +86,7 @@ type Line struct {
 	ps2        string   // Command continuations
 	buf        *buffer  // Text buffer
 	hist       *history // History file
-	con        *console.Console
+	term       *terminal.Terminal
 }
 
 // NewLine returns a line using both prompts ps1 and ps2, and setting the TTY to
@@ -94,16 +94,16 @@ type Line struct {
 // lenAnsi is the length of ANSI codes that the prompt ps1 could have.
 // If the history is nil then it is not used.
 func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
-	con, err := console.New(InputFd)
+	term, err := terminal.New(InputFd)
 	if err != nil {
 		return nil, err
 	}
-	if err = con.MakeRaw(); err != nil {
+	if err = term.MakeRaw(); err != nil {
 		return nil, err
 	}
 
 	lenPS1 := len(ps1) - lenAnsi
-	_, col := con.GetSize()
+	_, col := term.GetSize()
 
 	buf := newBuffer(lenPS1, col)
 	buf.insertRunes([]rune(ps1))
@@ -115,7 +115,7 @@ func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
 		ps2,
 		buf,
 		hist,
-		con,
+		term,
 	}, nil
 }
 
@@ -123,15 +123,15 @@ func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
 // the TTY to raw mode.
 // If the history is nil then it is not used.
 func NewDefaultLine(hist *history) (*Line, error) {
-	con, err := console.New(InputFd)
+	term, err := terminal.New(InputFd)
 	if err != nil {
 		return nil, err
 	}
-	if err = con.MakeRaw(); err != nil {
+	if err = term.MakeRaw(); err != nil {
 		return nil, err
 	}
 
-	_, col := con.GetSize()
+	_, col := term.GetSize()
 
 	buf := newBuffer(len(_PS1), col)
 	buf.insertRunes([]rune(_PS1))
@@ -143,13 +143,13 @@ func NewDefaultLine(hist *history) (*Line, error) {
 		_PS2,
 		buf,
 		hist,
-		con,
+		term,
 	}, nil
 }
 
-// Restore restores the console settings, so it is disabled the raw mode.
+// Restore restores the terminal settings, so it is disabled the raw mode.
 func (ln *Line) Restore() {
-	ln.con.Restore()
+	ln.term.Restore()
 }
 
 // Read reads charactes from input to write them to output, enabling line editing.
@@ -169,13 +169,13 @@ func (ln *Line) Read() (line string, err error) {
 	}
 
 	// == Detect change of window size.
-	console.TrapSize()
+	terminal.TrapSize()
 
 	go func() {
 		for {
 			select {
-			case <-console.WinSizeChan: // Wait for.
-				_, ln.buf.columns = ln.con.GetSize()
+			case <-terminal.WinSizeChan: // Wait for.
+				_, ln.buf.columns = ln.term.GetSize()
 				ln.buf.refresh()
 			}
 		}

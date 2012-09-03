@@ -3,7 +3,7 @@
 
 // +build ignore
 
-package console
+package terminal
 
 //cgo const TCGETS = TIOCGETA
 //cgo const TCSETS = TIOCSETA

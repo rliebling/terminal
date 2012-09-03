@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kless/console"
+	"github.com/kless/terminal"
 )
 
 func TestCharMode(t *testing.T) {
-	con, _ := console.New(syscall.Stderr)
+	term, _ := terminal.New(syscall.Stderr)
 	fmt.Println("\n== Terminal")
 
 	// == Read single key
@@ -34,14 +34,14 @@ func TestCharMode(t *testing.T) {
 		}()
 	}
 
-	con.SetCharMode()
+	term.SetCharMode()
 	rune, _ := ReadKey("\n + Mode on single character: ")
 	fmt.Printf("\n  pressed: %q\n", string(rune))
-	con.Restore()
+	term.Restore()
 
 	// == Echo
-	//con.Echo(false)
+	//term.Echo(false)
 	// TODO: add password
 
-	//con.Echo(true)
+	//term.Echo(true)
 }

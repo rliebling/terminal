@@ -103,7 +103,10 @@ func NewLine(ps1, ps2 string, lenAnsi int, hist *history) (*Line, error) {
 	}
 
 	lenPS1 := len(ps1) - lenAnsi
-	_, col := term.GetSize()
+	_, col, err := term.GetSize()
+	if err != nil {
+		return nil, err
+	}
 
 	buf := newBuffer(lenPS1, col)
 	buf.insertRunes([]rune(ps1))
@@ -131,7 +134,10 @@ func NewDefaultLine(hist *history) (*Line, error) {
 		return nil, err
 	}
 
-	_, col := term.GetSize()
+	_, col, err := term.GetSize()
+	if err != nil {
+		return nil, err
+	}
 
 	buf := newBuffer(len(_PS1), col)
 	buf.insertRunes([]rune(_PS1))
@@ -175,8 +181,11 @@ func (ln *Line) Read() (line string, err error) {
 		for {
 			select {
 			case <-terminal.WinSizeChan: // Wait for.
-				_, ln.buf.columns = ln.term.GetSize()
-				ln.buf.refresh()
+				_, col, err := ln.term.GetSize()
+				if err != nil {
+					ln.buf.columns = col
+					ln.buf.refresh()
+				}
 			}
 		}
 	}()

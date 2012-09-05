@@ -21,10 +21,6 @@ import (
 // == System calls
 //
 
-//cgo const (TCSANOW, TCSADRAIN, TCSAFLUSH)
-//cgo const TIOCGWINSZ
-//cgo type struct_winsize
-
 //sys	int tcgetattr(int fd, struct termios *termios_p)
 
 func tcgetattr(fd int, state *termios) (err error) {

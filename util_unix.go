@@ -73,9 +73,6 @@ func GetSizeFromEnv() (row, column int) {
 // Returns the number of bytes read.
 func ReadPassword(fd int, pass []byte) (n int, err error) {
 	var oldState, newState termios
-	var exit bool
-	tmpPass := make([]byte, len(pass))
-	sig := make(chan os.Signal, 1)
 
 	if err = tcgetattr(fd, &oldState); err != nil {
 		return 0, err
@@ -83,15 +80,15 @@ func ReadPassword(fd int, pass []byte) (n int, err error) {
 
 	// Turn off echo
 	newState = oldState
-	newState.Lflag &^= (_ECHO | _ECHOE | _ECHOK | _ECHONL)
+	newState.Lflag &^= (ECHO | ECHOE | ECHOK | ECHONL)
 
 	if err = tcsetattr(fd, _TCSANOW, &newState); err != nil {
 		return 0, fmt.Errorf("terminal: could not turn off echo: %s", err)
 	}
 
 	// Block SIGINT & SIGTSTP (CTRL-C, CTRL-Z)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTSTP)
-
 	go func() {
 		for {
 			select {
@@ -101,7 +98,9 @@ func ReadPassword(fd int, pass []byte) (n int, err error) {
 		}
 	}()
 
-	for i := 0; ; i++ { // to store all data read until '\n'
+	tmpPass := make([]byte, len(pass))
+
+	for i, exit := 0, false; ; i++ { // to store all data read until '\n'
 		n, err = syscall.Read(fd, tmpPass)
 		if err != nil {
 			tcsetattr(fd, _TCSANOW, &oldState)
@@ -123,6 +122,7 @@ func ReadPassword(fd int, pass []byte) (n int, err error) {
 		}
 	}
 
+	tmpPass = tmpPass[:0] // reset
 	tcsetattr(fd, _TCSANOW, &oldState)
 	return
 }

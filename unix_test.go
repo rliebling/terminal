@@ -135,12 +135,8 @@ func TestModes(t *testing.T) {
 	}
 
 	term.Restore()
-	fmt.Println()
-}
 
-func TestPassword(t *testing.T) {
-	fmt.Print("\n Password: ")
-	pass := make([]byte, 8)
+	// Password
 
 	/*if !*fInteractive {
 		go func() {
@@ -149,11 +145,18 @@ func TestPassword(t *testing.T) {
 		}()
 	}*/
 
-	n, err := ReadPassword(INPUT_FD, pass)
-	if err != nil {
-		t.Error(err)
+	if *fInteractive {
+		fmt.Print("\n Password: ")
+		pass := make([]byte, 8)
+
+		n, err := ReadPassword(INPUT_FD, pass)
+		if err != nil {
+			t.Error(err)
+		}
+		fmt.Printf("\n entered: %q\n number: %d\n", pass, n)
 	}
-	fmt.Printf("\n entered: %q\n number: %d\n\n", pass, n)
+
+	fmt.Println()
 }
 
 func TestInformation(t *testing.T) {

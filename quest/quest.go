@@ -102,7 +102,7 @@ func New(prefix, errPrefix, trueString, falseString string) *Question {
 		falseString,
 		extraBool,
 
-		term.Fd,
+		term.Fd(),
 		term.OriginalState(),
 	}
 }

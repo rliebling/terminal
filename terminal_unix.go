@@ -46,6 +46,11 @@ func New(fd int) (*Terminal, error) {
 	return t, nil
 }
 
+// Fd returns the Unix file descriptor referencing the terminal.
+func (t *Terminal) Fd() int {
+	return t.fd
+}
+
 // == Restore
 //
 

@@ -85,6 +85,7 @@ func Restore(fd int, st State) error {
 //cgo const (BRKINT, IGNBRK, ICRNL, INLCR, IGNCR, ISTRIP, IXON, PARMRK)
 //cgo const (OPOST, ECHO, ECHONL, ICANON, IEXTEN, ISIG)
 //cgo const (CSIZE, PARENB, CS8, VMIN, VTIME)
+//cgo const (ECHO, ECHOE, ECHOK, ECHONL)
 
 // MakeRaw sets the terminal to something like the "raw" mode. Input is available
 // character by character, echoing is disabled, and all special processing of
@@ -102,7 +103,7 @@ func (t *Terminal) MakeRaw() error {
 		_ISTRIP | _IXON | _PARMRK)
 
 	// Output modes - disable post processing.
-	t.State.Oflag &^= (_OPOST)
+	t.State.Oflag &^= _OPOST
 
 	// Local modes - echoing off, canonical off, no extended functions,
 	// no signal chars (^Z,^C).
@@ -110,7 +111,7 @@ func (t *Terminal) MakeRaw() error {
 
 	// Control modes - set 8 bit chars.
 	t.State.Cflag &^= (_CSIZE | _PARENB)
-	t.State.Cflag |= (_CS8)
+	t.State.Cflag |= _CS8
 
 	// Control chars - set return condition: min number of bytes and timer.
 	// We want read to return every single byte, without timeout.
@@ -128,9 +129,9 @@ func (t *Terminal) MakeRaw() error {
 // SetEcho turns the echo mode.
 func (t *Terminal) SetEcho(echo bool) error {
 	if !echo {
-		t.State.Lflag &^= (_ECHO)
+		t.State.Lflag &^= _ECHO
 	} else {
-		t.State.Lflag |= (_ECHO)
+		t.State.Lflag |= _ECHO
 	}
 
 	if err := tcsetattr(t.fd, _TCSANOW, t.State); err != nil {
@@ -143,7 +144,7 @@ func (t *Terminal) SetEcho(echo bool) error {
 // SetSingleChar sets the terminal to single-character mode.
 func (t *Terminal) SetSingleChar() error {
 	// Disable canonical mode, and set buffer size to 1 byte.
-	t.State.Lflag &^= (_ICANON)
+	t.State.Lflag &^= _ICANON
 	t.State.Cc[_VTIME] = 0
 	t.State.Cc[_VMIN] = 1
 

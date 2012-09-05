@@ -55,8 +55,10 @@ func TestModes(t *testing.T) {
 	if err != nil {
 		t.Error("expected to set mode:", err)
 	} else {
-		fmt.Print("\n + Mode to single character\n")
+		buf := bufio.NewReaderSize(INPUT, 4)
 		exit := false
+
+		fmt.Print("\n + Mode to single character\n")
 
 		if !*fInteractive {
 			reply := []string{
@@ -68,7 +70,7 @@ func TestModes(t *testing.T) {
 			go func() {
 				for _, r := range reply {
 					time.Sleep(time.Duration(*fTime) * time.Second)
-					fmt.Fprint(P_WR, r)
+					fmt.Fprint(OUTPUT, r)
 				}
 				exit = true
 			}()
@@ -77,8 +79,14 @@ func TestModes(t *testing.T) {
 		}
 
 		for {
-			rune, _ := ReadKey(INPUT, " Press key: ")
+			fmt.Print(" Press key: ")
+			rune, _, err := buf.ReadRune()
+			if err != nil {
+				term.Restore()
+				t.Fatal(err)
+			}
 			fmt.Printf("\n pressed: %q\n", string(rune))
+
 			if exit {
 				break
 			}
@@ -98,12 +106,13 @@ func TestModes(t *testing.T) {
 		if !*fInteractive {
 			go func() {
 				time.Sleep(time.Duration(*fTime) * time.Second)
-				fmt.Fprint(P_WR, "Karma\n")
+				fmt.Fprint(OUTPUT, "Karma\n")
 			}()
 		}
 		fmt.Print(" Write (enter to finish): ")
 		line, err := buf.ReadString('\n')
 		if err != nil {
+			term.Restore()
 			t.Fatal(err)
 		}
 		fmt.Printf("\n entered: %q\n", line)
@@ -114,7 +123,7 @@ func TestModes(t *testing.T) {
 		if !*fInteractive {
 			go func() {
 				time.Sleep(time.Duration(*fTime) * time.Second)
-				fmt.Fprint(P_WR, "hotel\n")
+				fmt.Fprint(OUTPUT, "hotel\n")
 			}()
 		}
 		fmt.Print(" Write (enter to finish): ")
@@ -127,6 +136,24 @@ func TestModes(t *testing.T) {
 
 	term.Restore()
 	fmt.Println()
+}
+
+func TestPassword(t *testing.T) {
+	fmt.Print("\n Password: ")
+	pass := make([]byte, 8)
+
+	/*if !*fInteractive {
+		go func() {
+			time.Sleep(time.Duration(*fTime) * time.Second)
+			fmt.Fprint(OUTPUT, "Parallel universe\n\n")
+		}()
+	}*/
+
+	n, err := ReadPassword(INPUT_FD, pass)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("\n entered: %q\n number: %d\n\n", pass, n)
 }
 
 func TestInformation(t *testing.T) {
@@ -152,6 +179,7 @@ func TestSize(t *testing.T) {
 
 	row, col, err := term.GetSize()
 	if err != nil {
+		term.Restore()
 		t.Fatal(err)
 	}
 	if row == 0 || col == 0 {
@@ -177,6 +205,7 @@ func TestSize(t *testing.T) {
 
 	row2, col2, err := term.GetSize()
 	if err != nil {
+		term.Restore()
 		t.Fatal(err)
 	}
 	if row == row2 || col == col2 {

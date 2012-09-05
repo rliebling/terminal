@@ -17,10 +17,8 @@ var (
 
 var (
 	INPUT    io.Reader
+	OUTPUT   io.Writer
 	INPUT_FD = syscall.Stderr
-
-	P_RD *io.PipeReader
-	P_WR *io.PipeWriter
 )
 
 func init() {
@@ -28,8 +26,8 @@ func init() {
 
 	if *fInteractive {
 		INPUT = os.Stderr
+		OUTPUT = os.Stdout
 	} else {
-		P_RD, P_WR = io.Pipe()
-		INPUT = P_RD
+		INPUT, OUTPUT = io.Pipe()
 	}
 }

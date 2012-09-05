@@ -11,6 +11,8 @@ const (
 	_CS8        = 0x30
 	_CSIZE      = 0x30
 	_ECHO       = 0x8
+	_ECHOE      = 0x10
+	_ECHOK      = 0x20
 	_ECHONL     = 0x40
 	_ICANON     = 0x2
 	_ICRNL      = 0x100

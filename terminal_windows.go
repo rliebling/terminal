@@ -21,11 +21,8 @@ import (
 )
 
 type Terminal struct {
-	// To checking if restore is needed
-	isNewState, isRawMode bool
-
-	// Handler
 	handle syscall.Handle
+	mod mode
 
 	// Size
 	row, column int
@@ -43,9 +40,7 @@ func New(handle syscall.Handle) (*Terminal, error) {
 		return nil, err
 	}
 
-	// The actual state is copied to another one
-	t.oldState = t.lastState
-
+	t.oldState = t.lastState // the actual state is copied to another one
 	t.handle = handle
 	return &t, nil
 }
@@ -64,13 +59,12 @@ func (t *Terminal) OriginalState() State {
 
 // Restore restores the original settings for the terminal.
 func (t *Terminal) Restore() error {
-	if t.isRawMode || t.isNewState {
+	if t.mod != 0 {
 		if err := setConsoleMode(t.handle, t.oldState); err != nil {
 			return fmt.Errorf("terminal: could not restore: %s", err)
 		}
 		t.lastState = t.oldState
-		t.isRawMode = false
-		t.isNewState = false
+		t.mod = 0
 	}
 	return nil
 }
@@ -86,13 +80,13 @@ func Restore(handle syscall.Handle, st State) error {
 // == Modes
 //
 
-// MakeRaw sets the terminal to something like the "raw" mode. Input is available
+// RawMode sets the terminal to something like the "raw" mode. Input is available
 // character by character, echoing is disabled, and all special processing of
 // terminal input and output characters is disabled.
 //
 // NOTE: in tty "raw mode", CR+LF is used for output and CR is used for input.
-func (t *Terminal) MakeRaw() error {
-	if t.isRawMode {
+func (t *Terminal) RawMode() error {
+	if t.mod&rawMode != 0 {
 		return nil
 	}
 
@@ -107,51 +101,51 @@ func (t *Terminal) MakeRaw() error {
 	if err := setConsoleMode(t.handle, t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not set raw mode: %s", err)
 	}
-	t.isRawMode = true
+	t.mod |= rawMode
 	return nil
 }
 
-// SetEcho turns the echo mode.
-func (t *Terminal) SetEcho(echo bool) error {
-	if !echo {
-		t.lastState &^= ENABLE_ECHO_INPUT
-	} else {
+// EchoMode turns the echo mode.
+func (t *Terminal) EchoMode(echo bool) error {
+	if echo {
 		t.lastState |= ENABLE_ECHO_INPUT
+	} else {
+		t.lastState &^= ENABLE_ECHO_INPUT
 	}
 
 	if err := setConsoleMode(t.handle, t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not turn echo mode: %s", err)
 	}
-	t.isNewState = true
+
+	if echo {
+		t.mod |= echoMode
+	} else {
+		t.mod &^= echoMode
+	}
 	return nil
 }
 
-// SetSingleChar sets the terminal to single-character mode.
-func (t *Terminal) SetSingleChar() (err error) {
-	t.lastState |= ENABLE_WINDOW_INPUT // | ENABLE_MOUSE_INPUT
-
-//	t.lastState &^= ENABLE_PROCESSED_OUTPUT
+// CharMode sets the terminal to single-character mode.
+func (t *Terminal) CharMode() (err error) {
+	t.lastState = ENABLE_WINDOW_INPUT // | ENABLE_MOUSE_INPUT
+	//t.lastState = 0
 
 	if err = setConsoleMode(t.handle, t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not set single-character mode: %s", err)
 	}
-	t.isNewState = true
+	t.mod |= charMode
 
 	var input _INPUT_RECORD
-	var numEvents uint32 = 1
+	var numEvents uint32
 
 	go func() {
 		for {
-			err = readConsoleInput(t.handle, &input, 1, &numEvents)
-			if err != nil {
-fmt.Println("ERR:", err)
-//				return(err)
-break
+			if err = readConsoleInput(t.handle, &input, 0, &numEvents); err != nil {
+				fmt.Fprintf(os.Stderr, "Fail! ReadConsoleInput: %s", err)
 			}
-
-			/*if input.EventType == _KEY_EVENT {
-			
-			}*/
+			if t.mod&charMode == 0 {
+				break
+			}
 		}
 	}()
 	return nil
@@ -163,8 +157,9 @@ func (t *Terminal) SetMode(state uint32) error {
 	if err := setConsoleMode(t.handle, state); err != nil {
 		return fmt.Errorf("terminal: could not set new mode: %s", err)
 	}
+
 	t.lastState = state
-	t.isNewState = true
+	t.mod |= otherMode
 	return nil
 }
 
@@ -199,6 +194,7 @@ func (t *Terminal) GetSize() (row, column int, err error) {
 	}
 */
 	info := new(_CONSOLE_SCREEN_BUFFER_INFO)
+
 	if e := getConsoleScreenBufferInfo(t.handle, info); e != nil {
 		err = os.NewSyscallError("getConsoleScreenBufferInfo", e)
 		return

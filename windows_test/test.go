@@ -57,7 +57,7 @@ func TestRawMode(t *testing.T) {
 
 //	oldState := term.oldState
 
-	if err = term.MakeRaw(); err != nil {
+	if err = term.RawMode(); err != nil {
 		t.Error("expected set raw mode:", err)
 	}
 
@@ -90,7 +90,7 @@ func TestModes(t *testing.T) {
 
 	// Single-character
 
-	err := term.SetSingleChar()
+	err := term.CharMode()
 	if err != nil {
 		log.Print("expected to set mode:", err)
 	} else {
@@ -113,11 +113,9 @@ func TestModes(t *testing.T) {
 				}
 				exit = true
 			}()
-		} else {
-			exit = true
 		}
 
-		for {
+		for i := 0; ; i++ {
 			fmt.Print(" Press key: ")
 			rune, _, err := buf.ReadRune()
 			if err != nil {
@@ -126,6 +124,9 @@ func TestModes(t *testing.T) {
 			}
 			fmt.Printf("\n pressed: %q\n", string(rune))
 
+			if *fInteractive && i == 1 {
+				break
+			}
 			if exit {
 				break
 			}
@@ -135,7 +136,7 @@ func TestModes(t *testing.T) {
 
 	// Echo
 
-	if err := term.SetEcho(false); err != nil {
+	if err := term.EchoMode(false); err != nil {
 		log.Print("expected to set mode:", err)
 	} else {
 		buf := bufio.NewReader(INPUT)
@@ -156,7 +157,7 @@ func TestModes(t *testing.T) {
 		}
 		fmt.Printf("\n entered: %q\n", line)
 
-		term.SetEcho(true)
+		term.EchoMode(true)
 		fmt.Print("\n + Mode to echo on\n")
 
 		if !*fInteractive {

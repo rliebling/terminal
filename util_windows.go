@@ -8,26 +8,23 @@
 
 package terminal
 
-/*// #include <unistd.h>
-import "C"*/
-
 import (
 	"fmt"
 	"os"
 	"os/signal"
-//	"strconv"
-//	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
-var shellsNotANSI = []string{"dumb", "cons25"}
+var shellsNotANSI = []string{"cmd.exe", "command.com"}
 
 // SupportANSI checks if the terminal supports ANSI escape sequences.
 func SupportANSI() bool {
-	term := os.Getenv("TERM")
+	term := os.Getenv("ComSpec") // full path to the command processor
 	if term == "" {
 		return false
 	}
+	term = filepath.Base(term)
 
 	for _, v := range shellsNotANSI {
 		if v == term {
@@ -37,14 +34,24 @@ func SupportANSI() bool {
 	return true
 }
 
+// Default values
+const (
+	d_ROW    = 24
+	d_COLUMN = 80
+)
+
+/*// #include <unistd.h>
+import "C"*/
+
+/*
 //C	char *ttyname(int fd)
 // http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/ttyname.c;hb=HEAD
 // http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/posix/ttyname.c;hb=HEAD
-/*It uses readlink and the /proc filesystem to query the kernel, and not a
+It uses readlink and the /proc filesystem to query the kernel, and not a
 dedicated syscall. Armed with that information, you can probably find the
 relevant kernel code which outputs the tty information in a format compatible
-with readlink.*/
-/*
+with readlink.
+
 // GetName gets the name of a terminal.
 func GetName(fd int) (string, error) {
 	name, errno := C.ttyname(C.int(fd))
@@ -53,16 +60,17 @@ func GetName(fd int) (string, error) {
 	}
 	return C.GoString(name), nil
 }
-*/
 
+*/
 //C	int isatty(int fd)
 // http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/posix/isatty.c;hb=HEAD
 
-// IsTerminal returns true if the file descriptor is a terminal.
-func IsTerminal(fd int) bool {
-	return tcgetattr(fd, &termios{}) == nil
+// IsTerminal returns true if the handler is a terminal.
+func IsTerminal(handle syscall.Handle) bool {
+	var st uint32
+	return getConsoleMode(handle, &st) == nil
 }
-
+/*
 // ReadPassword reads the input until '\n' without echo.
 // Returns the number of bytes read.
 func ReadPassword(fd int, pass []byte) (n int, err error) {
@@ -138,4 +146,4 @@ func TrapSize() {
 			}
 		}
 	}()
-}
+}*/

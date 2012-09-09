@@ -15,45 +15,40 @@ import (
 // A Terminal represents a general terminal interface.
 type Terminal struct {
 	// To checking if restore is needed
-	isNewState bool
-	IsRawMode  bool
+	isNewState, IsRawMode bool
 
-	fd int // file descriptor
+	// File descriptor
+	fd int
 
-	// Contains the state of a terminal
-	oldState *termios // in order to restore the original settings
-	State    *termios
+	// Size
+	row, column int
+
+	// Contain the state of a terminal, allowing to restore the original settings
+	oldState, lastState termios
 }
 
 // New creates a new terminal interface in the file descriptor.
 // Note that an input file descriptor should be used.
 func New(fd int) (*Terminal, error) {
-	t := new(Terminal)
+	var t Terminal
 
 	// Get the actual state
-	t.State = new(termios)
-	if err := tcgetattr(fd, t.State); err != nil {
+	if err := tcgetattr(fd, &t.lastState); err != nil {
 		return nil, err
 	}
 
 	// The actual state is copied to another one
-	t.oldState = new(termios)
-	*t.oldState = *t.State
+	t.oldState = t.lastState
 
 	t.fd = fd
-	return t, nil
-}
-
-// Fd returns the Unix file descriptor referencing the terminal.
-func (t *Terminal) Fd() int {
-	return t.fd
+	return &t, nil
 }
 
 // == Restore
 //
 
 type State struct {
-	wrap *termios
+	wrap termios
 }
 
 // OriginalState returns the terminal's original state.
@@ -64,10 +59,10 @@ func (t *Terminal) OriginalState() State {
 // Restore restores the original settings for the terminal.
 func (t *Terminal) Restore() error {
 	if t.IsRawMode || t.isNewState {
-		if err := tcsetattr(t.fd, _TCSANOW, t.oldState); err != nil {
+		if err := tcsetattr(t.fd, _TCSANOW, &t.oldState); err != nil {
 			return fmt.Errorf("terminal: could not restore: %s", err)
 		}
-		*t.State = *t.oldState
+		t.lastState = t.oldState
 		t.IsRawMode = false
 		t.isNewState = false
 	}
@@ -76,7 +71,7 @@ func (t *Terminal) Restore() error {
 
 // Restore restores the settings from State.
 func Restore(fd int, st State) error {
-	if err := tcsetattr(fd, _TCSANOW, st.wrap); err != nil {
+	if err := tcsetattr(fd, _TCSANOW, &st.wrap); err != nil {
 		return fmt.Errorf("terminal: could not restore: %s", err)
 	}
 	return nil
@@ -97,26 +92,26 @@ func (t *Terminal) MakeRaw() error {
 
 	// Input modes - no break, no CR to NL, no NL to CR, no carriage return,
 	// no strip char, no start/stop output control, no parity check.
-	t.State.Iflag &^= (BRKINT | IGNBRK | ICRNL | INLCR | IGNCR | ISTRIP | IXON | PARMRK)
+	t.lastState.Iflag &^= (BRKINT | IGNBRK | ICRNL | INLCR | IGNCR | ISTRIP | IXON | PARMRK)
 
 	// Output modes - disable post processing.
-	t.State.Oflag &^= OPOST
+	t.lastState.Oflag &^= OPOST
 
 	// Local modes - echoing off, canonical off, no extended functions,
 	// no signal chars (^Z,^C).
-	t.State.Lflag &^= (ECHO | ECHONL | ICANON | IEXTEN | ISIG)
+	t.lastState.Lflag &^= (ECHO | ECHONL | ICANON | IEXTEN | ISIG)
 
 	// Control modes - set 8 bit chars.
-	t.State.Cflag &^= (CSIZE | PARENB)
-	t.State.Cflag |= CS8
+	t.lastState.Cflag &^= (CSIZE | PARENB)
+	t.lastState.Cflag |= CS8
 
 	// Control chars - set return condition: min number of bytes and timer.
 	// We want read to return every single byte, without timeout.
-	t.State.Cc[VMIN] = 1 // Read returns when one char is available.
-	t.State.Cc[VTIME] = 0
+	t.lastState.Cc[VMIN] = 1 // Read returns when one char is available.
+	t.lastState.Cc[VTIME] = 0
 
 	// Put the terminal in raw mode after flushing
-	if err := tcsetattr(t.fd, _TCSAFLUSH, t.State); err != nil {
+	if err := tcsetattr(t.fd, _TCSAFLUSH, &t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not set raw mode: %s", err)
 	}
 	t.IsRawMode = true
@@ -126,12 +121,12 @@ func (t *Terminal) MakeRaw() error {
 // SetEcho turns the echo mode.
 func (t *Terminal) SetEcho(echo bool) error {
 	if !echo {
-		t.State.Lflag &^= ECHO
+		t.lastState.Lflag &^= ECHO
 	} else {
-		t.State.Lflag |= ECHO
+		t.lastState.Lflag |= ECHO
 	}
 
-	if err := tcsetattr(t.fd, _TCSANOW, t.State); err != nil {
+	if err := tcsetattr(t.fd, _TCSANOW, &t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not turn echo mode: %s", err)
 	}
 	t.isNewState = true
@@ -141,13 +136,25 @@ func (t *Terminal) SetEcho(echo bool) error {
 // SetSingleChar sets the terminal to single-character mode.
 func (t *Terminal) SetSingleChar() error {
 	// Disable canonical mode, and set buffer size to 1 byte.
-	t.State.Lflag &^= ICANON
-	t.State.Cc[VTIME] = 0
-	t.State.Cc[VMIN] = 1
+	t.lastState.Lflag &^= ICANON
+	t.lastState.Cc[VTIME] = 0
+	t.lastState.Cc[VMIN] = 1
 
-	if err := tcsetattr(t.fd, _TCSANOW, t.State); err != nil {
+	if err := tcsetattr(t.fd, _TCSANOW, &t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not set single-character mode: %s", err)
 	}
+	t.isNewState = true
+	return nil
+}
+
+// SetMode sets the terminal attributes given by state.
+// Warning: The use of this function could do your code not cross-system.
+func (t *Terminal) SetMode(state termios) error {
+	if err := tcsetattr(t.fd, _TCSANOW, &state); err != nil {
+		return fmt.Errorf("terminal: could not set new mode: %s", err)
+	}
+
+	t.lastState = state
 	t.isNewState = true
 	return nil
 }
@@ -155,12 +162,24 @@ func (t *Terminal) SetSingleChar() error {
 // == Utility
 //
 
-// GetSize gets the number of rows and columns from the kernel.
+// Fd returns the Unix file descriptor referencing the terminal.
+func (t *Terminal) Fd() int {
+	return t.fd
+}
+
+// GetSize returns the size of the terminal.
 func (t *Terminal) GetSize() (row, column int, err error) {
-	ws := new(winsize)
-	if e := getWinsize(t.fd, ws); e != nil {
+/*fmt.Println(t.row)
+	if t.row != 0 {
+println("OPS!")
+		return t.row, t.column, nil
+	}
+*/
+	var ws winsize
+	if e := getWinsize(t.fd, &ws); e != nil {
 		err = e
 		return
 	}
-	return int(ws.Row), int(ws.Col), nil
+	t.row, t.column = int(ws.Row), int(ws.Col)
+	return t.row, t.column, nil
 }

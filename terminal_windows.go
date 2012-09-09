@@ -9,41 +9,78 @@
 //
 //sys getConsoleMode(handle syscall.Handle, mode *uint32) (err error) = GetConsoleMode
 //sys setConsoleMode(handle syscall.Handle, mode uint32) (err error) = SetConsoleMode
-//sys getConsoleScreenBufferInfo(handle syscall.Handle, info *consoleScreenBufferInfo) (err error) = GetConsoleScreenBufferInfo
+//sys getConsoleScreenBufferInfo(handle syscall.Handle, info *_CONSOLE_SCREEN_BUFFER_INFO) (err error) = GetConsoleScreenBufferInfo
+//sys readConsoleInput(handleIn syscall.Handle, buf *_INPUT_RECORD, length uint32, numEvents *uint32) (err error) = ReadConsoleInputW
 
 package terminal
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 )
 
-type Console struct {
-	fd syscall.Handle
-
+type Terminal struct {
 	// To checking if restore is needed
-	isNewState bool
-	isRawMode  bool
+	isNewState, isRawMode bool
 
-	// Contains the state of a terminal
-	oldState uint32
-	newState uint32
+	// Handler
+	handle syscall.Handle
+
+	// Size
+	row, column int
+
+	// Contain the state of a terminal, allowing to restore the original settings
+	oldState, lastState uint32
 }
 
 // New creates a new terminal interface in the file descriptor.
-func New(fd syscall.Handle) (*Console, error) {
-	co := new(Console)
+func New(handle syscall.Handle) (*Terminal, error) {
+	var t Terminal
 
 	// Get the actual state
-	if err := getConsoleMode(fd, &co.newState); err != nil {
+	if err := getConsoleMode(handle, &t.lastState); err != nil {
 		return nil, err
 	}
 
 	// The actual state is copied to another one
-	co.oldState = co.newState
+	t.oldState = t.lastState
 
-	co.fd = fd
-	return co, nil
+	t.handle = handle
+	return &t, nil
+}
+
+// == Restore
+//
+
+type State struct {
+	wrap uint32
+}
+
+// OriginalState returns the terminal's original state.
+func (t *Terminal) OriginalState() State {
+	return State{t.oldState}
+}
+
+// Restore restores the original settings for the terminal.
+func (t *Terminal) Restore() error {
+	if t.isRawMode || t.isNewState {
+		if err := setConsoleMode(t.handle, t.oldState); err != nil {
+			return fmt.Errorf("terminal: could not restore: %s", err)
+		}
+		t.lastState = t.oldState
+		t.isRawMode = false
+		t.isNewState = false
+	}
+	return nil
+}
+
+// Restore restores the settings from State.
+func Restore(handle syscall.Handle, st State) error {
+	if err := setConsoleMode(handle, st.wrap); err != nil {
+		return fmt.Errorf("terminal: could not restore: %s", err)
+	}
+	return nil
 }
 
 // == Modes
@@ -54,88 +91,118 @@ func New(fd syscall.Handle) (*Console, error) {
 // terminal input and output characters is disabled.
 //
 // NOTE: in tty "raw mode", CR+LF is used for output and CR is used for input.
-func (co *Console) MakeRaw() error {
-	if co.isRawMode {
+func (t *Terminal) MakeRaw() error {
+	if t.isRawMode {
 		return nil
 	}
 
-	co.newState = 0
-	co.newState &^= _ENABLE_LINE_INPUT | _ENABLE_ECHO_INPUT | _ENABLE_PROCESSED_INPUT | _ENABLE_WINDOW_INPUT
+	t.lastState = 0
+	t.lastState &^= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT |
+		ENABLE_WINDOW_INPUT)
+
+// in Stdout
+//	t.lastState &^= (ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT)
 
 	// Put the terminal in raw mode
-	if err := setConsoleMode(co.fd, co.newState); err != nil {
+	if err := setConsoleMode(t.handle, t.lastState); err != nil {
 		return fmt.Errorf("terminal: could not set raw mode: %s", err)
 	}
-
-	co.isRawMode = true
+	t.isRawMode = true
 	return nil
 }
 
 // SetEcho turns the echo mode.
-func (co *Console) SetEcho(echo bool) error {
+func (t *Terminal) SetEcho(echo bool) error {
 	if !echo {
-		co.newState &^= _ENABLE_ECHO_INPUT
+		t.lastState &^= ENABLE_ECHO_INPUT
 	} else {
-		co.newState &= _ENABLE_ECHO_INPUT | _ENABLE_LINE_INPUT
+		t.lastState |= ENABLE_ECHO_INPUT
 	}
 
-	if err := setConsoleMode(co.fd, co.newState); err != nil {
-		ok := "on"
-		if !echo {
-			ok = "off"
-		}
-		return fmt.Errorf("terminal: could not turn %s echo mode: %s", ok, err)
+	if err := setConsoleMode(t.handle, t.lastState); err != nil {
+		return fmt.Errorf("terminal: could not turn echo mode: %s", err)
 	}
-	co.isNewState = true
+	t.isNewState = true
 	return nil
 }
 
-// == Restore
+// SetSingleChar sets the terminal to single-character mode.
+func (t *Terminal) SetSingleChar() (err error) {
+	t.lastState |= ENABLE_WINDOW_INPUT // | ENABLE_MOUSE_INPUT
+
+//	t.lastState &^= ENABLE_PROCESSED_OUTPUT
+
+	if err = setConsoleMode(t.handle, t.lastState); err != nil {
+		return fmt.Errorf("terminal: could not set single-character mode: %s", err)
+	}
+	t.isNewState = true
+
+	var input _INPUT_RECORD
+	var numEvents uint32 = 1
+
+	go func() {
+		for {
+			err = readConsoleInput(t.handle, &input, 1, &numEvents)
+			if err != nil {
+fmt.Println("ERR:", err)
+//				return(err)
+break
+			}
+
+			/*if input.EventType == _KEY_EVENT {
+			
+			}*/
+		}
+	}()
+	return nil
+}
+
+// SetMode sets the terminal attributes given by state.
+// Warning: The use of this function could do your code not cross-system.
+func (t *Terminal) SetMode(state uint32) error {
+	if err := setConsoleMode(t.handle, state); err != nil {
+		return fmt.Errorf("terminal: could not set new mode: %s", err)
+	}
+	t.lastState = state
+	t.isNewState = true
+	return nil
+}
+
+// == Utility
 //
+/*
+type WinSize struct {
+	Row    int16
+	Col    int16
+	Xpixel int16
+	Ypixel int16
+}
+*/
 
-type State uint32
-
-// OriginalState returns the terminal's original state.
-func (co *Console) OriginalState() State {
-	return State(co.oldState)
+// Fd returns the handle referencing the terminal.
+func (t *Terminal) Fd() int {
+	return int(t.handle)
 }
 
-// Restore restores the original settings for the terminal.
-func (co *Console) Restore() error {
-	if co.isRawMode || co.isNewState {
-		co.newState = co.oldState
-
-		if err := setConsoleMode(co.fd, co.newState); err != nil {
-			return fmt.Errorf("terminal: could not restore: %s", err)
-		}
-		co.isRawMode = false
-		co.isNewState = false
+/*func (t *Terminal) GetName() (name string, err error) {
+	var title string
+	if _, e := getConsoleTitle(&title, 128); e != nil {
+		return "", os.NewSyscallError("getConsoleTitle", e)
 	}
-	return nil
-}
+	return title, nil
+}*/
 
-// Restore restores the settings from State.
-func Restore(fd syscall.Handle, st State) error {
-	if err := setConsoleMode(fd, uint32(st)); err != nil {
-		return fmt.Errorf("terminal: could not restore: %s", err)
+// GetSize returns the size of the terminal.
+func (t *Terminal) GetSize() (row, column int, err error) {
+/*	if t.row != 0 {
+		return t.row, t.column, nil
 	}
-	return nil
-}
-
-// == 
-
-type Winsize struct {
-	Row    uint16
-	Col    uint16
-	Xpixel uint16
-	Ypixel uint16
-}
-
-func (co *Console) GetSize() (*Winsize, error) {
-	info := new(consoleScreenBufferInfo)
-
-	if err := getConsoleScreenBufferInfo(co.fd, &info); err != nil {
-		return nil, os.NewSyscallError("getConsoleScreenBufferInfo", err)
+*/
+	info := new(_CONSOLE_SCREEN_BUFFER_INFO)
+	if e := getConsoleScreenBufferInfo(t.handle, info); e != nil {
+		err = os.NewSyscallError("getConsoleScreenBufferInfo", e)
+		return
 	}
-	return WinSize{info.dwSize.x, info.dwSize.y}, nil
+	t.row, t.column = int(info.dwSize.x), int(info.dwSize.y)
+	return t.row, t.column, nil
 }

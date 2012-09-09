@@ -10,16 +10,10 @@
 
 package terminal
 
-/*// #include <unistd.h>
-import "C"*/
-
 import (
 	"syscall"
 	"unsafe"
 )
-
-// == System calls
-//
 
 //sys	int tcgetattr(int fd, struct termios *termios_p)
 
@@ -61,32 +55,3 @@ func getWinsize(fd int, ws *winsize) (err error) {
 	}
 	return
 }
-
-// == C library functions
-//
-
-//C	int isatty(int fd)
-// http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/posix/isatty.c;hb=HEAD
-
-// IsTerminal returns true if the file descriptor is a terminal.
-func IsTerminal(fd int) bool {
-	return tcgetattr(fd, &termios{}) == nil
-}
-
-/*
-//C	char *ttyname(int fd)
-// http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/ttyname.c;hb=HEAD
-// http://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/posix/ttyname.c;hb=HEAD
-It uses readlink and the /proc filesystem to query the kernel, and not a
-dedicated syscall. Armed with that information, you can probably find the
-relevant kernel code which outputs the tty information in a format compatible
-with readlink.
-
-// TTYName gets the name of a terminal.
-func TTYName(fd int) (string, error) {
-	name, errno := C.ttyname(C.int(fd))
-	if errno != nil {
-		return "", fmt.Errorf("terminal.TTYName: %s", errno)
-	}
-	return C.GoString(name), nil
-}*/

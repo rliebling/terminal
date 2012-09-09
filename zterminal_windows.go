@@ -14,6 +14,7 @@ var (
 	procGetConsoleMode             = modkernel32.MustFindProc("GetConsoleMode")
 	procSetConsoleMode             = modkernel32.MustFindProc("SetConsoleMode")
 	procGetConsoleScreenBufferInfo = modkernel32.MustFindProc("GetConsoleScreenBufferInfo")
+	procReadConsoleInputW          = modkernel32.MustFindProc("ReadConsoleInputW")
 )
 
 func getConsoleMode(handle syscall.Handle, mode *uint32) (err error) {
@@ -40,8 +41,20 @@ func setConsoleMode(handle syscall.Handle, mode uint32) (err error) {
 	return
 }
 
-func getConsoleScreenBufferInfo(handle syscall.Handle, info *consoleScreenBufferInfo) (err error) {
+func getConsoleScreenBufferInfo(handle syscall.Handle, info *_CONSOLE_SCREEN_BUFFER_INFO) (err error) {
 	r1, _, e1 := syscall.Syscall(procGetConsoleScreenBufferInfo.Addr(), 2, uintptr(handle), uintptr(unsafe.Pointer(info)), 0)
+	if int(r1) == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func readConsoleInput(handleIn syscall.Handle, buf *_INPUT_RECORD, length uint32, numEvents *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procReadConsoleInputW.Addr(), 4, uintptr(handleIn), uintptr(unsafe.Pointer(buf)), uintptr(length), uintptr(unsafe.Pointer(numEvents)), 0, 0)
 	if int(r1) == 0 {
 		if e1 != 0 {
 			err = error(e1)

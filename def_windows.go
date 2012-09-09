@@ -11,38 +11,18 @@ package terminal
 // == wincon.h
 
 const (
-	_ENABLE_LINE_INPUT         = 2
-	_ENABLE_ECHO_INPUT         = 4
-	_ENABLE_PROCESSED_INPUT    = 1
-	_ENABLE_WINDOW_INPUT       = 8
-	_ENABLE_MOUSE_INPUT        = 16
-	_ENABLE_INSERT_MODE        = 32
-	_ENABLE_QUICK_EDIT_MODE    = 64
-	_ENABLE_EXTENDED_FLAGS     = 128
-	_ENABLE_AUTO_POSITION      = 256
-	_ENABLE_PROCESSED_OUTPUT   = 1
-	_ENABLE_WRAP_AT_EOL_OUTPUT = 2
+	ENABLE_LINE_INPUT         = 2
+	ENABLE_ECHO_INPUT         = 4
+	ENABLE_PROCESSED_INPUT    = 1
+	ENABLE_WINDOW_INPUT       = 8
+	ENABLE_MOUSE_INPUT        = 16
+	ENABLE_INSERT_MODE        = 32
+	ENABLE_QUICK_EDIT_MODE    = 64
+	ENABLE_EXTENDED_FLAGS     = 128
+	ENABLE_AUTO_POSITION      = 256
+	ENABLE_PROCESSED_OUTPUT   = 1
+	ENABLE_WRAP_AT_EOL_OUTPUT = 2
 )
-
-// typedef struct _SMALL_RECT {
-//	SHORT Left;
-//	SHORT Top;
-//	SHORT Right;
-//	SHORT Bottom;
-// } SMALL_RECT, *PSMALL_RECT;
-
-type smallRect struct {
-	left, top, right, bottom int16
-}
-
-// typedef struct _COORD {
-//	SHORT X;
-//	SHORT Y;
-// } COORD, *PCOORD;
-
-type coord struct {
-	x, y int16
-}
 
 // typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
 //	COORD	dwSize;
@@ -52,10 +32,118 @@ type coord struct {
 //	COORD	dwMaximumWindowSize;
 // } CONSOLE_SCREEN_BUFFER_INFO,*PCONSOLE_SCREEN_BUFFER_INFO;
 
-type consoleScreenBufferInfo struct {
-	dwSize              coord
-	dwCursorPosition    coord
+type _CONSOLE_SCREEN_BUFFER_INFO struct {
+	dwSize              _COORD
+	dwCursorPosition    _COORD
 	wAttributes         uint16
-	srWindow            smallRect
-	dwMaximumWindowSize coord
+	srWindow            _SMALL_RECT
+	dwMaximumWindowSize _COORD
+}
+
+// typedef struct _INPUT_RECORD {
+//	WORD EventType;
+//	union {
+//		KEY_EVENT_RECORD KeyEvent;
+//		MOUSE_EVENT_RECORD MouseEvent;
+//		WINDOW_BUFFER_SIZE_RECORD WindowBufferSizeEvent;
+//		MENU_EVENT_RECORD MenuEvent;
+//		FOCUS_EVENT_RECORD FocusEvent;
+//	} Event;
+//} INPUT_RECORD,*PINPUT_RECORD;
+
+type _INPUT_RECORD struct {
+	EventType uint16
+	_Event
+}
+
+type _Event struct {
+	KeyEvent _KEY_EVENT_RECORD
+	MouseEvent _MOUSE_EVENT_RECORD
+	WindowBufferSizeEvent _WINDOW_BUFFER_SIZE_RECORD
+	MenuEvent _MENU_EVENT_RECORD
+	FocusEvent _FOCUS_EVENT_RECORD
+}
+
+// * * *
+
+// typedef struct _SMALL_RECT {
+//	SHORT Left;
+//	SHORT Top;
+//	SHORT Right;
+//	SHORT Bottom;
+// } SMALL_RECT, *PSMALL_RECT;
+
+type _SMALL_RECT struct {
+	left, top, right, bottom int16
+}
+
+// typedef struct _COORD {
+//	SHORT X;
+//	SHORT Y;
+// } COORD, *PCOORD;
+
+type _COORD struct {
+	x, y int16
+}
+
+// typedef struct _KEY_EVENT_RECORD {
+//	BOOL bKeyDown;
+//	WORD wRepeatCount;
+//	WORD wVirtualKeyCode;
+//	WORD wVirtualScanCode;
+//	union {
+//		WCHAR UnicodeChar;
+//		CHAR AsciiChar;
+//	} uChar;
+//	DWORD dwControlKeyState;
+// }
+// #ifdef __GNUC__
+// /* gcc's alignment is not what win32 expects */
+// PACKED
+// #endif
+// KEY_EVENT_RECORD;
+
+type _KEY_EVENT_RECORD struct {
+	bKeyDown bool
+	wRepeatCount uint16
+	wVirtualKeyCode uint16
+	wVirtualScanCode uint16
+	uChar
+	dwControlKeyState uint32
+}
+
+type uChar struct {
+	UnicodeChar rune
+	AsciiChar byte
+}
+
+// typedef struct _MOUSE_EVENT_RECORD {
+//	COORD dwMousePosition;
+//	DWORD dwButtonState;
+//	DWORD dwControlKeyState;
+//	DWORD dwEventFlags;
+// } MOUSE_EVENT_RECORD;
+
+type _MOUSE_EVENT_RECORD struct {
+	dwMousePosition _COORD
+	dwButtonState uint32
+	dwControlKeyState uint32
+	dwEventFlags uint32
+}
+
+// typedef struct _WINDOW_BUFFER_SIZE_RECORD {	COORD dwSize; } WINDOW_BUFFER_SIZE_RECORD;
+
+type _WINDOW_BUFFER_SIZE_RECORD struct {
+	dwSize _COORD
+}
+
+// typedef struct _MENU_EVENT_RECORD {	UINT dwCommandId; } MENU_EVENT_RECORD,*PMENU_EVENT_RECORD;
+type _MENU_EVENT_RECORD struct {
+	dwCommandId uint32
+}
+
+// typedef struct _FOCUS_EVENT_RECORD {	BOOL bSetFocus; } FOCUS_EVENT_RECORD;
+
+type _FOCUS_EVENT_RECORD struct {
+	bSetFocus bool
 }

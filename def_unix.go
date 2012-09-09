@@ -71,5 +71,4 @@ XCASE
 
 // c_cflag bits
 (B460800, B921600)
-
 */

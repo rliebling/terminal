@@ -4,15 +4,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// +build !plan9,!windows
+// +build !plan9
 
 package terminal
 
+
 import (
-	"fmt"
+//	"fmt"
+	"path/filepath"
 	"os"
-	"os/signal"
-	"strconv"
+//	"os/signal"
+//	"strconv"
 	"syscall"
 )
 
